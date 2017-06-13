@@ -1,0 +1,4 @@
+(fp_lib_table
+  (lib (name my_footprints)(type KiCad)(uri /Users/rusty/research/mini-ctd/logger_01/my_footprints.pretty)(options "")(descr ""))
+  (lib (name teensy)(type KiCad)(uri /Users/rusty/research/mini-ctd/teensy.pretty)(options "")(descr ""))
+)
