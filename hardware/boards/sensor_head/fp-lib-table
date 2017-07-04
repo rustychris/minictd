@@ -1,0 +1,3 @@
+(fp_lib_table
+  (lib (name sensor_head_footprints)(type KiCad)(uri /Users/rusty/research/mini-ctd/sensor_head01/sensor_head_footprints.pretty)(options "")(descr ""))
+)
