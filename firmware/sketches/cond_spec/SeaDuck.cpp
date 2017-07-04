@@ -1,4 +1,6 @@
-#include <Audio.h>
+// Now that PDB_CONFIG is completely defined locally, no need for
+// Audio import, right?
+// #include <Audio.h>
 
 #include "SeaDuck.h"
 
@@ -28,11 +30,36 @@ void check_adc_error() {
 }
 
 // borrow a sine wave table from data_waveforms.c in the Audio lib.
-// this could be created at startup in the dac_buffer to save a bit
-// of space.
-extern "C" {
-  extern const int16_t AudioWaveformSine[257];
-}
+// this could be created at startup in the dac_buffer for some
+// flexibility
+const int16_t AudioWaveformSine[257] = {
+     0,   804,  1608,  2410,  3212,  4011,  4808,  5602,  6393,  7179,
+  7962,  8739,  9512, 10278, 11039, 11793, 12539, 13279, 14010, 14732,
+ 15446, 16151, 16846, 17530, 18204, 18868, 19519, 20159, 20787, 21403,
+ 22005, 22594, 23170, 23731, 24279, 24811, 25329, 25832, 26319, 26790,
+ 27245, 27683, 28105, 28510, 28898, 29268, 29621, 29956, 30273, 30571,
+ 30852, 31113, 31356, 31580, 31785, 31971, 32137, 32285, 32412, 32521,
+ 32609, 32678, 32728, 32757, 32767, 32757, 32728, 32678, 32609, 32521,
+ 32412, 32285, 32137, 31971, 31785, 31580, 31356, 31113, 30852, 30571,
+ 30273, 29956, 29621, 29268, 28898, 28510, 28105, 27683, 27245, 26790,
+ 26319, 25832, 25329, 24811, 24279, 23731, 23170, 22594, 22005, 21403,
+ 20787, 20159, 19519, 18868, 18204, 17530, 16846, 16151, 15446, 14732,
+ 14010, 13279, 12539, 11793, 11039, 10278,  9512,  8739,  7962,  7179,
+  6393,  5602,  4808,  4011,  3212,  2410,  1608,   804,     0,  -804,
+ -1608, -2410, -3212, -4011, -4808, -5602, -6393, -7179, -7962, -8739,
+ -9512,-10278,-11039,-11793,-12539,-13279,-14010,-14732,-15446,-16151,
+-16846,-17530,-18204,-18868,-19519,-20159,-20787,-21403,-22005,-22594,
+-23170,-23731,-24279,-24811,-25329,-25832,-26319,-26790,-27245,-27683,
+-28105,-28510,-28898,-29268,-29621,-29956,-30273,-30571,-30852,-31113,
+-31356,-31580,-31785,-31971,-32137,-32285,-32412,-32521,-32609,-32678,
+-32728,-32757,-32767,-32757,-32728,-32678,-32609,-32521,-32412,-32285,
+-32137,-31971,-31785,-31580,-31356,-31113,-30852,-30571,-30273,-29956,
+-29621,-29268,-28898,-28510,-28105,-27683,-27245,-26790,-26319,-25832,
+-25329,-24811,-24279,-23731,-23170,-22594,-22005,-21403,-20787,-20159,
+-19519,-18868,-18204,-17530,-16846,-16151,-15446,-14732,-14010,-13279,
+-12539,-11793,-11039,-10278, -9512, -8739, -7962, -7179, -6393, -5602,
+ -4808, -4011, -3212, -2410, -1608,  -804,     0
+};
 
 #define BLOCKSIZE 256
 DMAMEM static uint16_t dac_buffer[BLOCKSIZE];
@@ -76,7 +103,10 @@ SeaDuck::SeaDuck()
   pdb_period=1025;
   dac_per_adc=2;
   adc_var_shift=4;
-  adc_n=20; 
+  adc_n=20;
+
+  pinMode(POWER_3V3_ENABLE_PIN,OUTPUT);
+  digitalWrite(POWER_3V3_ENABLE_PIN,HIGH);
 }
 
 void SeaDuck::fill_sine_buffer() {
@@ -152,7 +182,8 @@ void adc0_dma_isr(void)
 
 void SeaDuck::adc_init(void) {
   for(int adc_num=0;adc_num<2;adc_num++) {
-    adc->setReference(ADC_REF_3V3, adc_num);
+    // used to be ADC_REF_3V3
+    adc->setReference(ADC_REFERENCE::REF_3V3, adc_num);
     delay(5);
     adc->setResolution(16,adc_num);
     delay(5);
@@ -163,15 +194,16 @@ void SeaDuck::adc_init(void) {
     // default settings are good down to pdb period of 300.
     if(0) {
       // these settings are okay down to pdb period of 175.
-      adc->setConversionSpeed(ADC_HIGH_SPEED_16BITS,adc_num);
+      // adc->setConversionSpeed(ADC_HIGH_SPEED_16BITS,adc_num);
+      adc->setConversionSpeed(ADC_CONVERSION_SPEED::HIGH_SPEED_16BITS,adc_num);
       delay(5);
-      adc->setSamplingSpeed(ADC_HIGH_SPEED_16BITS,adc_num);
+      adc->setSamplingSpeed(ADC_SAMPLING_SPEED::HIGH_SPEED,adc_num);
       delay(5);
     } else {
       // probably ill-advised
-      adc->setConversionSpeed(ADC_VERY_HIGH_SPEED,adc_num);
+      adc->setConversionSpeed(ADC_CONVERSION_SPEED::VERY_HIGH_SPEED,adc_num);
       delay(5);
-      adc->setSamplingSpeed(ADC_VERY_HIGH_SPEED,adc_num);
+      adc->setSamplingSpeed(ADC_SAMPLING_SPEED::VERY_HIGH_SPEED,adc_num);
       delay(5);
     }
   }

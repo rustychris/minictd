@@ -3,8 +3,8 @@
 
 #include <ADC.h>
 #include <DMAChannel.h> // used to be in quotes
-#undef PDB_CONFIG // avoid clash between ADC and Audio
-#include <utility/pdb.h>
+// #undef PDB_CONFIG // avoid clash between ADC and Audio
+// #include <utility/pdb.h>
 
 #include "Shell.h"
 #include "seaduck_cfg.h"

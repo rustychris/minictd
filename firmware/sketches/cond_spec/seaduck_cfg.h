@@ -7,8 +7,11 @@
 #define CVSENSE1 A10
 #define CVSENSE2 A11
 
-#define RSENSE 470
+#define RSENSE 10
 #define C 15.0
 
 // This gain reflects the inamp gain
 #define CGAIN (10)
+
+// a digital output tied to the enable pin of the LDO
+#define POWER_3V3_ENABLE_PIN 3
