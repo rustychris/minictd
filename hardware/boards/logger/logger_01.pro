@@ -1,4 +1,4 @@
-update=Monday, June 12, 2017 'PMt' 09:54:41 PM
+update=Tuesday, June 20, 2017 'PMt' 10:27:33 PM
 version=1
 last_client=kicad
 [pcbnew]
@@ -23,16 +23,6 @@ ModuleOutlineThickness=0.150000000000
 [cvpcb]
 version=1
 NetIExt=net
-[schematic_editor]
-version=1
-PageLayoutDescrFile=
-PlotDirectoryName=
-SubpartIdSeparator=0
-SubpartFirstId=65
-NetFmtName=bom2csv
-SpiceForceRefPrefix=0
-SpiceUseNetNumbers=0
-LabSize=60
 [eeschema]
 version=1
 LibDir=
@@ -70,5 +60,15 @@ LibName30=valves
 LibName31=logger_parts
 LibName32=/Users/rusty/classes/research/freebird/github/freebird/hardware/logger/libraries/myparts
 LibName33=/Users/rusty/classes/research/mini-ctd/teensy_library/teensy
+[schematic_editor]
+version=1
+PageLayoutDescrFile=
+PlotDirectoryName=
+SubpartIdSeparator=0
+SubpartFirstId=65
+NetFmtName=bom2csv
+SpiceAjustPassiveValues=0
+LabSize=60
+ERC_TestSimilarLabels=1
 [general]
 version=1

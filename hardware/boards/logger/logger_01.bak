@@ -32,6 +32,7 @@ LIBS:valves
 LIBS:logger_parts
 LIBS:myparts
 LIBS:teensy
+LIBS:logger_01-cache
 EELAYER 26 0
 EELAYER END
 $Descr A4 11693 8268
@@ -1497,17 +1498,4 @@ F 3 "" H 3400 3900 50  0001 C CNN
 $EndComp
 Text Notes 700  750  0    60   ~ 0
 Add BH123 holder for BOM\nAdd crystal for teensy RTC
-$Comp
-L Crystal Y?
-U 1 1 594403CE
-P 1150 4850
-F 0 "Y?" H 1150 5118 50  0000 C CNN
-F 1 "Crystal" H 1150 5027 50  0000 C CNN
-F 2 "" H 1150 4850 50  0001 C CNN
-F 3 "" H 1150 4850 50  0001 C CNN
-F 4 "CFS-20632768HZFB" H 1150 4850 60  0001 C CNN "part_num"
-F 5 "300-8763-ND" H 1150 4850 60  0001 C CNN "digikey_num"
-	1    1150 4850
-	1    0    0    -1  
-$EndComp
 $EndSCHEMATC
