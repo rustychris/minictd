@@ -11,6 +11,9 @@
 // #include <utility/pdb.h>
 
 #include "SeaDuck.h"
+#include "ms5803.h"
+#include "thermistor.h"
+#include "conductivity.h"
 
 SeaDuck seaduck;
 

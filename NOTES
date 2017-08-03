@@ -1,0 +1,86 @@
+Is the voltage regulator working?
+  on bootup, no output, it appears.
+  write 0 to enable - still no 3V3.
+  write 1 to enable pin on boot --
+  solid 3.28 V, distibuted across board it appears.
+  
+Add code to make sure it's enabled on bootup -- will come back to adding
+code which cycles on and off, including sequencing with DAC
+
+
+Somewhat surprisingly, it appears to be scanning just fine, though the
+results are slightly unexpected.
+
+With a 10ohm load, dialed in a delay of -1.04e-6 s, compared to something 1.5e-6s
+with the previous board.
+
+This puts the real impedance around 2, and a capacitive reactance once the
+frequency gets above maybe 10kHz.
+
+Is there some weird loading that I'm not understanding?
+
+Maybe better to plot bode of the two readings separately, before they
+are divided to get impedance.
+
+From those plots, looks like the drive amplitude increases to a maximum
+around 4kHz. 
+
+With a delay of 24 us, the phase curves overlap perfectly up to almost 10kHz,
+above which the current sense goes sort of crazy.
+
+What time constants might arise based on the schematic?
+
+The outside nodes of the decoupling are 10uF series, and a 120k to
+virtual ground.  That has a time constant of 1.2s, and should look
+like a high pass.  That means 45deg phase shift at 1.2s, and asymptoting
+to zero phase at high frequency.  I should be well away from
+any of that.
+
+There is a little funkiness because the "middle" nodes are basically shorted,
+they have double the capacitance, and half the resistance.  Time constant
+should be the same.
+
+What does a scan look like with an open circuit?  
+
+Not bad - below 10kHz, the perceived impedance trails down
+some, and much of it shows a phase shift of something like -30deg.
+But at 10kHz it's showing an impedance of 100k - nice.
+
+The per-channel data show a noisy current sense, several orders
+of magnitude below the voltage sense.  Makes sense - there's a nice
+10R across there, while the voltage sense is open, though with 120k
+on the other side of the caps.
+
+Voltage sense shows a pole (?) at about 30kHz, with phase
+shooting up.
+
+With a cap on there - the nyquist diagram has a nice straight up,
+low frequencies => large +imag(z).
+
+The whole thing is shifted a bit off zero - like even at
+high frequency it would have a series resistance of 6.
+That could be some sort of interaction between the decoupling
+caps and the capacitive d.u.t.
+
+This also resulted in a nice peaked amplitude at 5100Hz.
+
+Probably need to run this through the scope to really see what's going
+on.
+
+ - tried a quick ltspice simulation, which didn't turn up anything.
+ - is it possible that it's a GBW thing?  gain of 10 for voltage sense,
+   but 200 for current sense?  800kHz unity gain bandwidth!  So I am
+   hitting that ceiling for sure, and likely that it makes the current
+   sense side look a bit capacitive, making the impedance overall look
+   inductive.  Really ought to stick something a bit higher in there,
+   get some of that gain back.
+   The real fix probably is a different inamp, maybe even something
+   with automatic gain?
+
+   Interim fix, set the gain on current sense same as the voltage sense,
+   and accept that resolution won't be great. put R19 back to 10k (or maybe it
+   was a 12k)
+   
+ - interestingly, this also fixes the need for extra phase adjustment in
+   the past.  I guess in that older circuit, I didn't have any gain for
+   the current sense, and 10 for the voltage sense.

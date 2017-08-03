@@ -1,0 +1,73 @@
+SeaDuck orchestrates the prompts, command parsing, scanning.
+
+Each sensor channel has a class, with a common API:
+
+init(): one-time initialization code which can safely be run
+  at startup, with no hardware access.  No guarantee here that
+  the analog front end has power.
+
+setup(): 
+
+
+Step back - what are the needs from the thermistor, ms5803 and conductivity circuit?
+
+ms5803:
+  startup: initialize I2C library, select address (static, easy),
+    download coefficients over I2C. (may have to be split into two steps)
+  
+  read: sends I2C convert command, waits preprogrammed amount of time, sends I2C
+   read command, pulls down bytes, and then some math.  has to do that for both
+   temperature and pressure in sequence.  delay is on the order of 10ms worst case.
+  
+
+thermistor:
+  startup: set the thermistor pin to be input.
+
+  read: configure ADC averaging.  assuming that ADC mode is otherwise okay, can
+    skip any calibration.  adc->analogRead() is sufficient here. hopefully
+    references, sample time, conversion time can all stay the same as for
+    conductivity.
+    
+conductivity:
+  startup: fair amount of initialization - DMAMEM, DMAChannel, settings for pdb,
+   the sine table.
+
+  before a reading, call fill_sine_buffer() which does that and also zeros out
+  other buffers and counts.
+
+  adc_init: this sets reference, averaging, disable pga, conversion speed, sampling
+   speed.  hopefully all of that can be done just once, and probably outside
+   conductivity, such that the settings are shared between the thermistor and
+   conductivity.
+   this also sets
+     SIM_SOPT7=0; // just to be sure that ADC trigger is from PDB.
+   which as I recall only matters...
+   
+   bottom line: mostly moved to a system-level init call.
+
+  dac_init: can be called just once from conductivity setup.
+  
+adc_setup(): to be done before each conductivity reading
+
+dac_setup(): configure DMA for the DAC before a reading
+
+For consistency with other modules -- conductivity.init() should be called
+on boot.
+Is there a good reason to have separate setup() and read() calls?  Thermistor
+and ms5803 do not have that split.
+There is some work here which must be done when the settings change, but could
+be skipped if settings don't change.
+
+Thinking towards the future:
+  ctor: Completely self-contained setting of values in memory can happen during
+  the constructors.
+
+  init: Enabling clocks, turning on parts of the ARM should happen in init().  This
+  will be manually sequenced from SeaDuck.  Anything which needs to be
+  done once upon waking up from deepest sleep mode should be here.  Calibrating
+  the pressure sensor might be in an init(), or reading its calibration values.
+
+  read: Taking a measurement, which for now blocks, and leaves the result in
+  this->reading.
+
+  

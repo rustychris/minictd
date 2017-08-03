@@ -1497,7 +1497,7 @@ F 3 "" H 3400 3900 50  0001 C CNN
 	1    0    0    -1  
 $EndComp
 Text Notes 700  750  0    60   ~ 0
-Add BH123 holder for BOM\nAdd crystal for teensy RTC\nis it safe for en_3v3 not to have a pull-down?  might come up floating?
+Add BH123 holder for BOM\nAdd crystal for teensy RTC\nis it safe for en_3v3 not to have a pull-down?  might come up floating?\nThe AD623s are being used at and beyond their bandwidth!  with the\n  10ohm shunt, I tried a 470R gain setting for 200x, which kills the\n  performance above 5kHz or so.
 $Comp
 L Crystal Y?
 U 1 1 594403CE

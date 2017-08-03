@@ -32,6 +32,7 @@ LIBS:valves
 LIBS:logger_parts
 LIBS:myparts
 LIBS:teensy
+LIBS:logger_01-cache
 EELAYER 26 0
 EELAYER END
 $Descr A4 11693 8268
@@ -1496,7 +1497,7 @@ F 3 "" H 3400 3900 50  0001 C CNN
 	1    0    0    -1  
 $EndComp
 Text Notes 700  750  0    60   ~ 0
-Add BH123 holder for BOM\nAdd crystal for teensy RTC
+Add BH123 holder for BOM\nAdd crystal for teensy RTC\nis it safe for en_3v3 not to have a pull-down?  might come up floating?
 $Comp
 L Crystal Y?
 U 1 1 594403CE

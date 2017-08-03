@@ -15,3 +15,12 @@
 
 // a digital output tied to the enable pin of the LDO
 #define POWER_3V3_ENABLE_PIN 3
+
+
+#define NTC_SENSE A0
+#define NTC_ADC ADC_0
+#define NTC_GAIN 10 // from inamp
+#define NTC_R_REF 120000.0 
+
+
+

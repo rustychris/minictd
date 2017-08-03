@@ -15,22 +15,6 @@ public:
   // mostly globals, to lessen the pain of access from ISR
   SeaDuck(); 
 
-  void dac_init();
-  void dac_status();
-  void fill_sine_buffer();
-  void adc_init();
-  void adc_setup();
-  void adc0_setup();
-  void adc1_setup(void);
-  void dac_setup(void);
-  void pdb_setup(void);
-
-  void pdb_stop(void);
-  void adc0_stop(void);
-  void adc1_stop(void);
-  void adc_stop(void);
-  void dac_stop();
-
   void setup();
   virtual void dispatch_command();
   virtual void help();
@@ -42,5 +26,7 @@ public:
 };
 
 extern SeaDuck seaduck;
+
+void check_adc_error();
 
 #endif // SEADUCK_H
