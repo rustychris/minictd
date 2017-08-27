@@ -70,4 +70,5 @@ Thinking towards the future:
   read: Taking a measurement, which for now blocks, and leaves the result in
   this->reading.
 
-  
+  dispatch_command(): for module specific commands.  return true if handled,
+    false if not.

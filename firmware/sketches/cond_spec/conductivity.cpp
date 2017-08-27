@@ -1,5 +1,7 @@
-extern ADC *adc;
+#include <ADC.h>
+#include <DMAChannel.h> // used to be in quotes
 
+#include "SeaDuck.h"
 #include "conductivity.h"
 
 // Sequencing of ADC usage (for now, analog power bus is always on)
@@ -84,10 +86,11 @@ uint32_t adc1_variance[BLOCKSIZE];
 
 Conductivity::Conductivity() {
   // set some basic, sane settings
-  pdb_period=1025;
-  dac_per_adc=2;
-  adc_var_shift=4;
-  adc_n=20;
+  // DBG
+  // pdb_period=1025;
+  // dac_per_adc=2;
+  // adc_var_shift=4;
+  // adc_n=20;
 }
 
 void Conductivity::init(void) {
@@ -515,7 +518,12 @@ void Conductivity::dac_stop() {
   *(uint16_t *)&(DAC0_DAT0L) = dac_mid;
 }
 
-// Higher level steps:
+// ---  Higher level steps ---
+
+// scan_setup():
+//   Conduct steps to initiate a conductivity reading.
+//   At return of this function, the reading will be
+//   underway.
 void Conductivity::scan_setup() {
   Serial.println("# About to adc setup");
   fill_sine_buffer();
@@ -533,9 +541,10 @@ void Conductivity::scan_cleanup() {
   dac_stop();
 }
 
-void Conductivity::scan_loop() {
-  int j;
-  
+// scan_loop():
+//   Called after scan_setup(), to wait until reading is
+//   complete.
+void Conductivity::wait_for_scan() {
   Serial.print("#");
   while( (adc0_n < adc_n) ||
          (adc1_n < adc_n) ) {
@@ -549,7 +558,7 @@ void Conductivity::scan_dump() {
   Serial.println("idx,dac,adc0_mean,adc0_var,adc1_mean,adc1_var");
   float mean, variance;
   
-  for(j=0;j<buff_n_samples;j++) {
+  for(int j=0;j<buff_n_samples;j++) {
     // not sure why it's losing so much. this didn't help:
     // while( !Serial.availableForWrite() ) ; // dangerous???
     // delay(5); // 50 fixed it, but was painful.
@@ -572,20 +581,26 @@ void Conductivity::scan_dump() {
   }
 }
 
+// scan():
+//   Setup-to-cleanup scan, with a full dump of the readings
+//   including phase-resolved values
 void Conductivity::scan() {
   scan_setup();
 
-  scan_loop();
+  wait_for_scan();
 
   scan_dump();
   
   scan_cleanup();
 }
 
+// read():
+//   Generic interface for SeaDuck, setup-to-cleanup scan,
+//   reducing the values to a conductivity value.
 void Conductivity::read() {
   scan_setup();
 
-  scan_loop();
+  wait_for_scan();
 
   scan_reduce();
   
@@ -595,4 +610,132 @@ void Conductivity::read() {
 void Conductivity::scan_reduce() {
   // HERE
   reading=3.14159; // BOGUS
+}
+
+
+bool Conductivity::dispatch_command(const char *cmd, const char *cmd_arg) {
+  if ( strcmp(cmd,"scan")==0 ) {
+    scan();
+  } else if ( strcmp(cmd,"scan_period")==0 ) {
+    if(cmd_arg) {
+      int32_t new_period=atoi(cmd_arg);
+      uint8_t new_prescaler=0;
+      if ( new_period < 100 ) {
+        Serial.println("ERROR: period is too short (<100)");
+      } else {
+        while ( new_period > ((int32_t)1<<15) ) {
+          new_period >>= 1;
+          new_prescaler++;
+        }
+        if ( new_prescaler > 7 ) {
+          Serial.println("ERROR: period is too long");
+          pdb_prescaler=0;
+          return true;
+        }
+        Serial.print("new_period="); Serial.println(new_period);
+        Serial.print("new_prescaler="); Serial.println(new_prescaler);
+        pdb_prescaler=new_prescaler; 
+        pdb_period=new_period;
+      }
+    } else {
+      Serial.print("scan_period="); Serial.println( pdb_period*(1<<pdb_prescaler) );
+    }
+  } else if ( strcmp(cmd,"dac_oversample")==0) {
+    if(cmd_arg) {
+      int new_oversample=(int16_t)atoi(cmd_arg);
+      if ( (new_oversample < 1)
+           || (new_oversample>32 )
+           || ( new_oversample & (new_oversample-1)) != 0 ) {
+        Serial.println("ERROR: oversample must be power of 2, 1..16");
+      } else {
+        dac_per_adc=new_oversample;
+      }
+    } else {
+      Serial.print("dac_oversample="); Serial.println(dac_per_adc);
+    }
+  } else if ( strcmp(cmd,"stride")==0) {
+    if(cmd_arg) {
+      int new_stride=(int16_t)atoi(cmd_arg);
+      if ( (new_stride < 1)
+           || (new_stride>64 )
+           || ( new_stride & (new_stride-1)) != 0 ) {
+        Serial.println("ERROR: stride must be power of 2, 1..64");
+      } else {
+        dac_out_stride=new_stride;
+      }
+    } else {
+      Serial.print("stride="); Serial.println(dac_out_stride);
+    }
+  } else if (strcmp(cmd,"dac_status")==0) {
+    dac_status();
+  } else if ( strcmp(cmd,"n_discard")==0) {
+    if(cmd_arg) {
+      int new_discard=(int16_t)atoi(cmd_arg);
+      if ( (new_discard < 0)
+           || (new_discard>100 )) {
+        Serial.println("ERROR: n_discard must be 0..100");
+      } else {
+        adc_n_discard=new_discard;
+      }
+    } else {
+      Serial.print("n_discard="); Serial.println(adc_n_discard);
+    }
+  }
+  // new way - set loop count directly.
+  else if ( strcmp(cmd,"n_loops")==0 ) {
+    if (cmd_arg) {
+      int new_n_loops=(int16_t)atoi(cmd_arg);
+      if ( (new_n_loops<1) ||
+           (new_n_loops>1000) ) {
+        // actually 1000 is arbitrary, but to avoid bugs leading
+        // to an apparent hang, keep it reasonably low
+        Serial.println("ERROR: n_loop must be between 1 and 1000");
+      } else {
+        adc_n=new_n_loops;
+        adc_var_shift=0;
+        while( (4<<adc_var_shift) < adc_n ) adc_var_shift++;
+      }
+    } else {
+      Serial.print("n_loops="); Serial.println(adc_n);
+    }
+  }
+  else if ( strcmp(cmd,"dac_shift")==0) {
+    if(cmd_arg) {
+      int new_shift=(uint16_t)atoi(cmd_arg);
+      if ( (new_shift < 0) || (new_shift>15 ) ) {
+        Serial.println("ERROR: shift must be between 0 and 15");
+      } else {
+        dac_shift=new_shift;
+      }
+    } else {
+      Serial.print("dac_shift="); Serial.println(dac_shift);
+    }
+  } else if ( strcmp(cmd,"dac_mid")==0) {
+    if(cmd_arg) {
+      uint16_t new_mid=(uint16_t)atoi(cmd_arg);
+      if ( (new_mid < 0) || (new_mid>4095 ) ) {
+        Serial.println("ERROR: dac output range is 0..4095");
+      } else {
+        dac_mid=dac_mid;
+      }
+    } else {
+      Serial.print("dac_mid="); Serial.println(dac_mid);
+    }
+  } else {
+    return false;
+  }
+  return true;
+}
+
+void Conductivity::help() {
+  Serial.println("  Conductivity cell");
+  Serial.println("    scan  # run initiate a transfer function scan");
+  Serial.println("    scan_period[=NNNN] # set the speed of the scan");
+  Serial.println("    dac_stride[=1,2,4,8,...] # shorten waveform");
+  Serial.println("    dac_oversample[=1,2,4,8,16] # oversample DAC");
+  Serial.println("    accum_shift[=0..6] # average over 4*2^N loops");
+  Serial.println("    dac_shift[=0..15] # scaling of wave table");
+  Serial.println("    dac_mid[=0..4095] # center point for dac output");
+  Serial.println("    n_loops[=1..1000] # number of averaging loops");
+  Serial.println("    dac_status # diagnostic printout ");
 }

@@ -4,16 +4,17 @@
  */
 #include <SPI.h>
 #include <SD.h>
+#include <Wire.h>
+#include <TimeLib.h>
 
-// #include <Audio.h>
 #include <ADC.h>
-#include <DMAChannel.h> // used to be in quotes
-// #include <utility/pdb.h>
+#include <DMAChannel.h>
 
 #include "SeaDuck.h"
 #include "ms5803.h"
 #include "thermistor.h"
 #include "conductivity.h"
+#include "rtclock.h"
 
 SeaDuck seaduck;
 

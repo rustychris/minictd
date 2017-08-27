@@ -2,15 +2,16 @@
 #include "pressure.h"
 #include "ms5803.h"
 
+// This blocks everything if there are problems.
 MS5803 sensor(ADDRESS_HIGH); // 0x76, the default for SFE board, and sensor head
 double pressure_baseline;
 
 void pressure_setup(){
   //Retrieve calibration constants for conversion math.
-  sensor.reset();
-  sensor.begin();
+  // sensor.reset();
+  // sensor.begin();
   
-  pressure_baseline = sensor.getPressure(ADC_4096);
+  // pressure_baseline = sensor.getPressure(ADC_4096);
 }
 
 void pressure_read() {
@@ -25,10 +26,10 @@ void pressure_read() {
   // ADC_4096
     
   // Read temperature from the sensor in deg C. 
-  temperature_c = sensor.getTemperature(CELSIUS, ADC_512);
+  //DBG temperature_c = sensor.getTemperature(CELSIUS, ADC_512);
     
   // Read pressure from the sensor in mbar.
-  pressure_abs = sensor.getPressure(ADC_4096);
+  //DBG pressure_abs = sensor.getPressure(ADC_4096);
      
   Serial.print("temp_ms5803==");
   Serial.print(temperature_c);

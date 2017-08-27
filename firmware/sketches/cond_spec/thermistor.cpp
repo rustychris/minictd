@@ -1,15 +1,16 @@
 //-------------------Thermistor-------------//
 #include "seaduck_cfg.h"
 #include "SeaDuck.h"
+#include "thermistor.h"
 
-void ntc_setup() {
+void Thermistor::init() {
   pinMode(NTC_SENSE,INPUT);
 }
 
-void ntc_read() {
+void Thermistor::read() {
   int dbridge;
-  float dratio,temp;
-  float R,T;
+  float dratio;
+  float R;
 
   // HERE -- use direct acd programming, or at least compatible with
   // SeaDuck.cpp
@@ -37,8 +38,8 @@ void ntc_read() {
   // dratio = Rref / (Rntc+Rref) - 1/2
   // 1/dratio -1 = Rntc/Rref
   R= NTC_R_REF*(1/dratio -1);
-  // currently, breathing on it makes the numbers go more negative.
-  Serial.print("[Temp] bridge counts: ");
+  
+  Serial.print("# [Temp] bridge counts: ");
   Serial.print(dbridge);
   Serial.print("  mV: ");
   Serial.print( 3.3*1000*dratio );
@@ -46,9 +47,25 @@ void ntc_read() {
   Serial.print(R);
 
   //fiction!
-  T=23.0 - (R-108000)*0.0005;
+  reading=23.0 - (R-108000)*0.0005;
   Serial.print(" T(degC): ");
-  Serial.print(T);
+  Serial.print(reading);
   
   Serial.println("");
+}
+
+bool Thermistor::dispatch_command(const char *cmd, const char *cmd_arg) {
+  if( strcmp(cmd,"temperature")==0 ) {
+    read();
+    Serial.print("temperature=");
+    Serial.println(reading);
+  } else {
+    return false;
+  }
+  return true;
+}
+
+void Thermistor::help() {
+  Serial.println("  Thermistor");
+  Serial.println("    temperature  # read the thermistor and print the result");
 }

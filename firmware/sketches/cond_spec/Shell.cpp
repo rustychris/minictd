@@ -105,7 +105,7 @@ void Shell::get_next_command(const char *prompt) {
 }
 
 void Shell::help(void){
-  Serial.println("What's wrong?");
   Serial.println("Available commands:");
-  Serial.println(" softboot # reboot");
+  Serial.println("  System");
+  Serial.println("    softboot # reboot");
 }

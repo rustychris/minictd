@@ -34,7 +34,7 @@ Distributed as-is; no warranty is given.
 MS5803::MS5803(ms5803_addr address)
 // Base library type I2C
 {
-  Wire.begin(); // Arduino Wire library initializer
+  // Wire.begin(); // this gets called at a more controlled time in SeaDuck::setup()
   _address = address; //set interface used for communication
 }
 
