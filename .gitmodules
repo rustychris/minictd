@@ -1,0 +1,3 @@
+[submodule "firmware/libraries/SdFat"]
+	path = firmware/libraries/SdFat
+	url = https://github.com/greiman/SdFat.git

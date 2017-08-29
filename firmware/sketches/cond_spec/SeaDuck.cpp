@@ -5,12 +5,14 @@
 #include "thermistor.h"
 #include "conductivity.h"
 #include "rtclock.h"
+#include "SdFunctions.h"
 
 ADC *adc=new ADC();
 
 Conductivity cond;
 Thermistor ntc;
 RTClock clock;
+Storage storage;
 
 void check_adc_error() {
   if ( adc->adc1->fail_flag != ADC_ERROR_CLEAR ) {
@@ -110,6 +112,7 @@ void SeaDuck::help() {
   cond.help();
   ntc.help();
   clock.help();
+  storage.help();
 }
 
 

@@ -22,5 +22,4 @@
 #define NTC_GAIN 10 // from inamp
 #define NTC_R_REF 120000.0 
 
-
-
+#define SD_PIN_CS 12

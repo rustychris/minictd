@@ -4,6 +4,7 @@
  */
 #include <SPI.h>
 #include <SD.h>
+
 #include <Wire.h>
 #include <TimeLib.h>
 
@@ -15,6 +16,7 @@
 #include "thermistor.h"
 #include "conductivity.h"
 #include "rtclock.h"
+#include "SdFunctions.h"
 
 SeaDuck seaduck;
 
