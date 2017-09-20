@@ -28,7 +28,7 @@ local pub, and you've found our code helpful, please buy us a round!
 Distributed as-is; no warranty is given.
 ******************************************************************************/
 
-#include <Wire.h> // Wire library is used for I2C
+#include <i2c_t3.h> // Wire library is used for I2C
 #include "ms5803.h"
 
 MS5803::MS5803(ms5803_addr address)
@@ -56,11 +56,11 @@ uint8_t MS5803::begin(void)
     uint8_t highByte = Wire.read(); 
     uint8_t lowByte = Wire.read();
     coefficient[i] = (highByte << 8)|lowByte;
-  // Uncomment below for debugging output.
-  //  Serial.print("C");
-  //  Serial.print(i);
-  //  Serial.print("= ");
-  //  Serial.println(coefficient[i]);
+    // Uncomment below for debugging output.
+    //   Serial.print("C");
+    //   Serial.print(i);
+    //   Serial.print("= ");
+    //   Serial.println(coefficient[i]);
   }
 
   return 0;

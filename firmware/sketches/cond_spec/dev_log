@@ -1,0 +1,21 @@
+2017-08-27
+
+Wire.begin() hangs when called from the MS5803 constructor.  Probably it happens out of
+order and depends on something that's not enabled yet.  Better to call it from SeaDuck::setup().
+
+Real time clock:
+
+Arduino time library supports down to seconds, and can be layered on top of teensy 3 clock.
+Will return time as unix standard seconds.
+
+Should I read from the arduino API, directly from Teensy3Clock, or from whatever
+lies beneath the surface of that? Not sure what the benefit would be of the 
+Arduino API at this point.  Already have to reach under the covers to get sub-second
+resolution.
+
+SD Card next??
+ - on freebird, did the SD code use the teensy-specific I2C library?  I don't think so.
+   that was just for interleaving calls to the ADS1115 and MPU9150.
+ - were there local modifications to any other parts of that code?
+ - will try the 3rd party SdFat, which is what freebird used, and is supposed to be
+   more up to date than the SD library.

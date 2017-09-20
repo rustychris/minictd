@@ -3,9 +3,9 @@
  *  trying some spectroscopy
  */
 #include <SPI.h>
-#include <SD.h>
+#include <SdFat.h>
 
-#include <Wire.h>
+#include <i2c_t3.h>
 #include <TimeLib.h>
 
 #include <ADC.h>
@@ -18,12 +18,12 @@
 #include "rtclock.h"
 #include "SdFunctions.h"
 
-SeaDuck seaduck;
+SeaDuck logger;
 
 void setup() {
-  seaduck.setup();
+  logger.setup();
 }
 
 void loop() {
-  seaduck.loop();
+  logger.loop();
 }

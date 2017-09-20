@@ -22,4 +22,14 @@
 #define NTC_GAIN 10 // from inamp
 #define NTC_R_REF 120000.0 
 
-#define SD_PIN_CS 12
+// this is pin 12 of the schematic symbol, but in teensy land
+// it's called pin 10
+// 11,12 are out/in, 13 is SCK
+#define SD_PIN_CS 10
+
+// Storage related settings:
+#define CMDFILE "STARTUP.CMD"
+// this MUST be a full 8.3 filename - like DATAxxxx.BIN
+#define DATAFILETEMPLATE "DATAxxxx.BIN"
+#define STREAM_START_LINE "$"
+#define MONITOR_START_LINE "#"

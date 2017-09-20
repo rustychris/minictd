@@ -16,11 +16,25 @@
  * and SDFormatter uses FAT12.
  */
 #include <Arduino.h>
-#include <SD.h>
 
 #include "seaduck_cfg.h"
 
+// Test with reduced SPI speed for breadboards.  SD_SCK_MHZ(4) will select 
+// the highest speed supported by the board that is not over 4 MHz.
+// Change SPI_SPEED to SD_SCK_MHZ(50) for best performance.
+#define SPI_SPEED SD_SCK_MHZ(4)
+
+#include <SPI.h>
+#include <SdFat.h>
+
 #include "SdFunctions.h"
+#include "SeaDuck.h"
+
+// Set DISABLE_CHIP_SELECT to disable a second SPI device.
+// For example, with the Ethernet shield, set DISABLE_CHIP_SELECT
+// to 10 to disable the Ethernet controller.
+const int8_t DISABLE_CHIP_SELECT = -1;
+
 
 // Change the value of chipSelect if your hardware does
 // not use the default value, SS.  Common values are:
@@ -29,13 +43,10 @@
 // Adafruit SD shields and modules: pin 10
 const uint8_t chipSelect = SD_PIN_CS;
 
-// Change spiSpeed to SPI_FULL_SPEED for better performance
-// Use SPI_QUARTER_SPEED for even slower SPI bus speed
-const uint8_t spiSpeed = SD_SPEED;
+ArduinoOutStream cout(Serial);
 
 Sd2Card card; // for formatting
-// maybe these aren't defined in the arduino library version
-// SdFat sd;     // for logging
+SdFat sd;     // for logging
 SdFile myFile;// for logging
 
 uint32_t cardSizeBlocks;
@@ -72,14 +83,15 @@ char fat32str[] = "FAT32   ";
 #define sdError(msg) sdError_P(PSTR(msg))
 
 void sdError_P(const char* str) {
-  cout << pstr("error: ");
-  cout << pgm(str) << endl;
+  cout << F("error: ");
+  cout << str << endl;
   if (card.errorCode()) {
-    cout << pstr("SD error: ") << hex << int(card.errorCode());
+    cout << F("SD error: ") << hex << int(card.errorCode());
     cout << ',' << int(card.errorData()) << dec << endl;
   }
   while (1);
 }
+
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 // write cached block to the card
@@ -108,7 +120,7 @@ void initSizes() {
     sectorsPerCluster = 128;
   }
 
-  cout << pstr("Blocks/Cluster: ") << int(sectorsPerCluster) << endl;
+  cout << F("Blocks/Cluster: ") << int(sectorsPerCluster) << endl;
   // set fake disk geometry
   sectorsPerTrack = cardCapacityMB <= 256 ? 32 : 63;
 
@@ -362,7 +374,7 @@ void makeFat32() {
 // flash erase all data
 uint32_t const ERASE_SIZE = 262144L;
 void eraseCard() {
-  cout << endl << pstr("Erasing\n");
+  cout << endl << F("Erasing\n");
   uint32_t firstBlock = 0;
   uint32_t lastBlock;
   uint16_t n = 0;
@@ -379,23 +391,23 @@ void eraseCard() {
 
   if (!card.readBlock(0, cache.data)) sdError("readBlock");
   cout << hex << showbase << setfill('0') << internal;
-  cout << pstr("All data set to ") << setw(4) << int(cache.data[0]) << endl;
+  cout << F("All data set to ") << setw(4) << int(cache.data[0]) << endl;
   cout << dec << noshowbase << setfill(' ') << right;
-  cout << pstr("Erase done\n");
+  cout << F("Erase done\n");
 }
 //------------------------------------------------------------------------------
 void formatCard() {
   cout << endl;
-  cout << pstr("Formatting\n");
+  cout << F("Formatting\n");
   initSizes();
   if (card.type() != SD_CARD_TYPE_SDHC) {
-    cout << pstr("FAT16\n");
+    cout << F("FAT16\n");
     makeFat16();
   } else {
-    cout << pstr("FAT32\n");
+    cout << F("FAT32\n");
     makeFat32();
   }
-  cout << pstr("Format done\n");
+  cout << F("Format done\n");
 }
 
 //------------------------------------------------------------------------------
@@ -411,8 +423,8 @@ void Storage::format(char c) {
   //  'Q' quick format only
 
   //  Soft spi options are configured in SdFat/SdFatConfig.h
-  if (!card.init(SD_SPEED, SD_PIN_CS)) {
-    mySerial.print(
+  if (!card.begin(SD_PIN_CS,SPI_SPEED)) {
+    Serial.print(
      "\nSD initialization failure!\n"
      "Is the SD card inserted correctly?\n"
      "Is chip select correct at the top of this sketch?\n");
@@ -422,9 +434,9 @@ void Storage::format(char c) {
   if (cardSizeBlocks == 0) sdError("cardSize");
   cardCapacityMB = (cardSizeBlocks + 2047)/2048;
 
-  mySerial.print("Card Size: ");
-  mySerial.print(cardCapacityMB);
-  mySerial.println(" MB, (MB = 1,048,576 bytes)");
+  Serial.print("Card Size: ");
+  Serial.print(cardCapacityMB);
+  Serial.println(" MB, (MB = 1,048,576 bytes)");
 
   if (c == 'E' || c == 'F') {
     eraseCard();
@@ -484,18 +496,19 @@ uint8_t block[512 * BUFFER_BLOCK_COUNT];
 
 inline uint8_t queueNext(uint8_t ht) {return (ht + 1) & (QUEUE_DIM -1);}
 
-void Storage::begin(void) {
+void Storage::init(void) {
   // this is called once on boot up
 #ifndef DISABLE_STORE
   // And initialize the SD interface and open a file
-  if (!SD.begin(SD_PIN_CS, SD_SPEED)) {
+  
+  if (!sd.begin(SD_PIN_CS, SPI_SPEED)) {
     // rather than halt, go into a loop repeating the message 
     // to make it easier to catch on a serial console
     // beep_code(Logger::NO_SD_CARD);
-    // for(int i=0;i<20;i++) {
-    //   sd.initErrorPrint();
-    //   delay(500);
-    // }
+    for(int i=0;i<20;i++) {
+      sd.initErrorPrint();
+      delay(500);
+    }
     status=NOCARD;
   } else {
     status=ENABLED;
@@ -504,6 +517,7 @@ void Storage::begin(void) {
   status=DISABLED;
 #endif
 }
+
 // This is called before sampling begins, setting up the buffers
 // and in the future possibly pre-allocating files.
 void Storage::setup(void) {
@@ -541,9 +555,11 @@ void Storage::open_next_file(void) {
   if (!myFile.open(active_filename, O_RDWR | O_CREAT)) {
     sd.errorHalt("opening output file for write failed");
   } 
-  DateTime dt=logger.now();
+  time_t unixtime=logger.unixtime();
   myFile.timestamp(T_ACCESS|T_CREATE|T_WRITE,
-                   dt.year(),dt.month(),dt.day(),dt.hour(),dt.minute(),dt.second());
+                   // dt.year(),dt.month(),dt.day(),dt.hour(),dt.minute(),dt.second());
+                   year(unixtime), month(unixtime), day(unixtime),hour(unixtime),
+                   minute(unixtime),second(unixtime));
   sync_counter=0;
 }
 
@@ -568,8 +584,8 @@ void Storage::set_next_active_filename(void) {
       for(active_filename[6]='0';active_filename[6]<='9';active_filename[6]++) {
         for(active_filename[7]='0';active_filename[7]<='9';active_filename[7]++) {
           if( ! sd.exists(active_filename) ) {
-            mySerial.print("Logging to ");
-            mySerial.println(active_filename);
+            Serial.print("Logging to ");
+            Serial.println(active_filename);
             return;
           }
         }
@@ -592,15 +608,15 @@ void Storage::loop(void) {
 
     if( log_to_serial ) {
       for(int fidx=0;fidx<block->frame_count;fidx++) {
-        mySerial.print(STREAM_START_LINE);
+        Serial.print(STREAM_START_LINE);
         for(int i=0;i<frame_bytes;i++){
           uint8_t byte=block->data[fidx*frame_bytes+i];
           // unfortunately, Serial drops leading 0, so manually pad each byte to 2 hex digits.
           if( byte<0x10 ) 
-            mySerial.print("0");
-          mySerial.print(byte,HEX);
+            Serial.print("0");
+          Serial.print(byte,HEX);
         }
-        mySerial.println();
+        Serial.println();
       }
     } else {
       if ( status==ENABLED ) {
@@ -685,7 +701,7 @@ void Storage::open_block(uint8_t flags) {
     emptyTail = queueNext(emptyTail);
     // initialize block:
     isrBuf->frame_count = 0; // no frames
-    isrBuf->unixtime=logger.unixtime;
+    isrBuf->unixtime=logger.unixtime(); // logger.unixtime;
     isrBuf_pos=0;
 #ifdef RTC_ENABLE
     isrBuf->ticks=logger.rtc_pulse_count;
@@ -715,7 +731,8 @@ void Storage::close_block(void){
 
 size_t Storage::write(uint8_t b) {
   // switch to a text block if necessary
-  if( isrBuf && (isrBuf->flags&FLAG_TYPE_MASK == FLAG_TYPE_DATA) ) {
+  if( isrBuf &&
+      ( (isrBuf->flags&FLAG_TYPE_MASK) == FLAG_TYPE_DATA) ) {
     close_block();
   }
 
@@ -730,6 +747,7 @@ size_t Storage::write(uint8_t b) {
     isrBuf_pos=DATA_DIM-1; // just in case isrBuf_pos got crazy
     close_block();
   }
+  return 1;
 }
 
 uint8_t Storage::send_data(const char *filename,uint32_t start,uint32_t bytes) {
@@ -742,8 +760,8 @@ uint8_t Storage::send_data(const char *filename,uint32_t start,uint32_t bytes) {
   uint8_t checksum=0;
   
   if (!myFile.open(filename, O_READ )) {
-    mySerial.print("Failed to open ");
-    mySerial.println(filename);
+    Serial.print("Failed to open ");
+    Serial.println(filename);
     return 1;
   }
   myFile.seekSet(start);
@@ -756,34 +774,34 @@ uint8_t Storage::send_data(const char *filename,uint32_t start,uint32_t bytes) {
 
   for(uint32_t i=0;i<bytes;i++) {
     myFile.read(&c,1);
-    if( c<0xF ) mySerial.write('0');
-    mySerial.print(c,HEX);
+    if( c<0xF ) Serial.write('0');
+    Serial.print(c,HEX);
     if((i>0) && ((i & 0x3F) == 0x3F) ) 
-      mySerial.println("");
+      Serial.println("");
     checksum+=c;
   }
-  mySerial.println("");
-  if( checksum<0xF ) mySerial.write('0');
-  mySerial.println(checksum,HEX);
+  Serial.println("");
+  if( checksum<0xF ) Serial.write('0');
+  Serial.println(checksum,HEX);
   
   myFile.close();
   return 0;
 }
 
-void Storage::info(Print &out) 
+void Storage::info() 
 {
-  out.print("storage_status: ");
-  out.println(status);
-  out.print("storage_status_name: ");
+  Serial.print("storage_status: ");
+  Serial.println(status);
+  Serial.print("storage_status_name: ");
   if (status==DISABLED) {
-    out.println("DISABLED");
+    Serial.println("DISABLED");
   } else if (status==NOCARD) {
-    out.println("NOCARD");
+    Serial.println("NOCARD");
   } else if (status==ENABLED) {
-    out.println("ENABLED");
+    Serial.println("ENABLED");
   }
-  out.print("log_to_serial: ");
-  out.println(log_to_serial);
+  Serial.print("log_to_serial: ");
+  Serial.println(log_to_serial);
 }
 
 bool confirm(void) {
@@ -799,7 +817,7 @@ bool confirm(void) {
 bool Storage::dispatch_command(const char *cmd, const char *cmd_arg) {
   if(strcmp(cmd,"erase")==0) {
     if( confirm() )
-      store.format('E');
+      format('E');
     else {
       Serial.println("Aborted");
     }
@@ -816,7 +834,7 @@ bool Storage::dispatch_command(const char *cmd, const char *cmd_arg) {
   } else if ( strcmp(cmd,"ls")==0) {
     sd.ls(&Serial,LS_SIZE);
   } else if ( strcmp(cmd,"sd_status")==0) {
-    info(&Serial);
+    info();
   } else {
     return false;
   }
@@ -824,5 +842,10 @@ bool Storage::dispatch_command(const char *cmd, const char *cmd_arg) {
 }
 
 void Storage::help() {
-  
+  Serial.println("  Storage");
+  Serial.println("    erase       # erase SD card");
+  Serial.println("    format      # format SD card");
+  Serial.println("    quickformat # as advertised");
+  Serial.println("    ls          # show files on sd card");
+  Serial.println("    sd_status   # display SD info");
 }

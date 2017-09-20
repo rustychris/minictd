@@ -1,4 +1,4 @@
-#include <Wire.h>
+#include <i2c_t3.h>
 
 #include "SeaDuck.h"
 #include "pressure.h"
@@ -9,6 +9,7 @@
 
 ADC *adc=new ADC();
 
+Pressure pressure;
 Conductivity cond;
 Thermistor ntc;
 RTClock clock;
@@ -82,13 +83,20 @@ SeaDuck::SeaDuck()
 void SeaDuck::setup() {
   Shell::setup();
 
-  Wire.begin();
+  // have to select non-default pins
+  Wire.begin(I2C_MASTER, // mode
+             0, // address - ignored
+             I2C_PINS_16_17, // match with schematic
+             I2C_PULLUP_EXT, // we have external pullups
+             400000 // rate is 400kHz
+             );
   
   Serial.println("SeaDuck setup");
   common_adc_init();
 
+  storage.init();
   cond.init();
-  pressure_setup();
+  pressure.init();
   ntc.init();
   clock.init();
 }
@@ -96,8 +104,10 @@ void SeaDuck::setup() {
 void SeaDuck::dispatch_command() {
   if ( cond.dispatch_command(cmd,cmd_arg) ) {
     return;
-  } else if ( strcmp(cmd,"pressure")==0 ) {
-    pressure_read();
+  } else if ( pressure.dispatch_command(cmd,cmd_arg) ) {
+    return;
+  } else if ( storage.dispatch_command(cmd,cmd_arg) ) {
+    return;
   } else if ( ntc.dispatch_command(cmd,cmd_arg) ) {
     return;
   } else if ( clock.dispatch_command(cmd,cmd_arg) ) {
@@ -113,7 +123,11 @@ void SeaDuck::help() {
   ntc.help();
   clock.help();
   storage.help();
+  pressure.help();
 }
 
 
-
+time_t SeaDuck::unixtime() {
+  clock.read();
+  return clock.reading_seconds;
+}

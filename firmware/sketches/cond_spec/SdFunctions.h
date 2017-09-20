@@ -8,11 +8,6 @@
 
 #include <Print.h>
 
-// not needed with Arduino libraries
-// #include <SdFat.h>
-extern SdFat sd;
-
-
 
 class Storage : public Print {
 public:
@@ -25,7 +20,7 @@ public:
   virtual size_t write(uint8_t b);
 
   // called once on system startup
-  void begin(void);
+  void init(void);
 
   void format(char c);
 
@@ -38,7 +33,7 @@ public:
   void loop(void);
   void cleanup(void);
 
-  void info(Print &);
+  void info(void);
 
   void store_frame(uint8_t *frame);
   void open_block(uint8_t flags);

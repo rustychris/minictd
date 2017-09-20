@@ -6,6 +6,8 @@
 // #include <utility/pdb.h>
 
 #include "Shell.h"
+#include <TimeLib.h>
+
 #include "seaduck_cfg.h"
 
 extern ADC *adc;
@@ -24,9 +26,11 @@ public:
   void scan_setup();
   void scan_loop();
   void scan_cleanup();
+
+  time_t unixtime(); 
 };
 
-extern SeaDuck seaduck;
+extern SeaDuck logger;
 
 void check_adc_error();
 
