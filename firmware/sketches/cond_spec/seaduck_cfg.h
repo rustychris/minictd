@@ -8,7 +8,7 @@
 #define CVSENSE2 A11
 
 #define RSENSE 10
-#define C 15.0
+#define CELL_CONSTANT 15.0
 
 // This gain reflects the inamp gain
 #define CGAIN (10)

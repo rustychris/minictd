@@ -5,7 +5,12 @@
 #include "conductivity.h"
 
 // Sequencing of ADC usage (for now, analog power bus is always on)
-// 
+
+// Current wiring:
+// Gray: Vcc
+// Purple: ground
+// Blue: SCL
+// Green: SDA
 
 // since ADC and Audio define this differently, define our own here.
 // the only real difference is DMAEN.  That means that PDB triggers
@@ -91,6 +96,8 @@ Conductivity::Conductivity() {
   // dac_per_adc=2;
   // adc_var_shift=4;
   // adc_n=20;
+  log_full_scan=true;
+  log_reduced_scan=false;
 }
 
 void Conductivity::init(void) {
@@ -555,6 +562,11 @@ void Conductivity::wait_for_scan() {
 }
 
 void Conductivity::scan_dump() {
+  write_frame_info(Serial);
+  write_data(Serial);
+  return;
+
+  
   Serial.println("idx,dac,adc0_mean,adc0_var,adc1_mean,adc1_var");
   float mean, variance;
   
@@ -710,6 +722,21 @@ bool Conductivity::dispatch_command(const char *cmd, const char *cmd_arg) {
     } else {
       Serial.print("dac_shift="); Serial.println(dac_shift);
     }
+  } else if ( strcmp(cmd,"log_cond_scan")==0 ) {
+    if ( cmd_arg ) {
+      log_full_scan=(cmd_arg[0]=='1');
+    }
+    Serial.print("log_cond_scan=");
+    Serial.println(log_full_scan?'1':'0');
+  } else if ( strcmp(cmd,"log_cond_reduced")==0 ) {
+    if ( cmd_arg ) {
+      log_reduced_scan=(cmd_arg[0]=='1');
+    }
+    Serial.print("log_cond_reduced=");
+    Serial.println(log_reduced_scan?'1':'0');
+  } else if ( strcmp(cmd,"freq")==0 ) {
+    Serial.print("freq=");
+    Serial.println(real_freq_hz());
   } else if ( strcmp(cmd,"dac_mid")==0) {
     if(cmd_arg) {
       uint16_t new_mid=(uint16_t)atoi(cmd_arg);
@@ -729,7 +756,7 @@ bool Conductivity::dispatch_command(const char *cmd, const char *cmd_arg) {
 
 void Conductivity::help() {
   Serial.println("  Conductivity cell");
-  Serial.println("    scan  # run initiate a transfer function scan");
+  Serial.println("    scan  # run a transfer function scan");
   Serial.println("    scan_period[=NNNN] # set the speed of the scan");
   Serial.println("    dac_stride[=1,2,4,8,...] # shorten waveform");
   Serial.println("    dac_oversample[=1,2,4,8,16] # oversample DAC");
@@ -737,5 +764,108 @@ void Conductivity::help() {
   Serial.println("    dac_shift[=0..15] # scaling of wave table");
   Serial.println("    dac_mid[=0..4095] # center point for dac output");
   Serial.println("    n_loops[=1..1000] # number of averaging loops");
+  Serial.println("    freq              # calculate drive frequency");
   Serial.println("    dac_status # diagnostic printout ");
+  Serial.println("    log_cond_scan[=0,1] # disable/enable full scan output");
+  Serial.println("    log_cond_reduced[=0,1] # ...  reduced scan output");
 }
+
+
+void Conductivity::write_frame_info(Print &out)
+{
+  // see dev_log
+  out.print("[");
+  if ( log_full_scan ) {
+    out.print( "('freq_hz','<i4'),('sample_count','<i4'),('shunt_mean','<i4',");
+    out.print( buff_n_samples );
+    out.print( "),('shunt_var','<i4',");
+    out.print( buff_n_samples );
+    out.print( "),('cell_mean','<i4',");
+    out.print( buff_n_samples );
+    out.print( "),('cell_var','<i4',");
+    out.print( buff_n_samples );
+    out.print( "),");
+  }
+  if ( log_reduced_scan ) {
+    out.print( "('imp_real','<i4'),('imp_imag','<i4'),");
+  }
+  out.println("]");
+}
+
+uint8_t hexmap[]={'0','1','2','3','4','5','6','7',
+                  '8','9','A','B','C','D','E','F'};
+
+void write_base16(Print &out,uint8_t *buff,int count)
+{
+  static uint8_t hexbuff[121];
+
+  int i=0;
+  int pos=0;
+  
+  for(;i<count;i++) {
+    hexbuff[pos]  =hexmap[ (buff[i]>>4) & 0xF ];
+    hexbuff[pos+1]=hexmap[  buff[i]     & 0xF ];
+    pos+=2;
+    if( pos == 120 ) {
+      hexbuff[pos]='\n';
+      out.write(hexbuff,121);
+      pos=0;
+    }
+  }
+  if( pos > 0 ){
+    hexbuff[pos]='\n';
+    out.write(hexbuff,pos+1);
+  }
+}
+
+// does it make a difference whether this comes in as
+// a Stream or a Print ?  Print doesn't seem to write()
+// no difference
+void Conductivity::write_data(Print &out)
+{
+  int an_int;
+  
+  if ( log_full_scan ) {
+    an_int=real_freq_hz();
+    //out.write((uint8_t*)&an_int,sizeof(an_int));
+    write_base16(out,(uint8_t*)&an_int,sizeof(an_int));
+
+    an_int=(adc0_n-adc_n_discard);
+    write_base16(out,(uint8_t*)&an_int,sizeof(an_int));
+
+    // shunt mean
+    write_base16(out,(uint8_t*)adc1_accum,sizeof(adc1_accum[0])*buff_n_samples);
+    write_base16(out,(uint8_t*)adc1_variance,sizeof(adc1_variance[0])*buff_n_samples);
+    write_base16(out,(uint8_t*)adc0_accum,sizeof(adc0_accum[0])*buff_n_samples);
+    write_base16(out,(uint8_t*)adc0_variance,sizeof(adc0_variance[0])*buff_n_samples);
+    
+    out.print("STOP\n"); // DBG trying to flush
+    out.flush(); // having trouble seeing any of that stuff above.
+  }
+  
+  if ( log_reduced_scan ) {
+    // reduction not written yet
+    an_int=-999;
+    write_base16(out,(uint8_t*)&an_int,sizeof(an_int));
+    write_base16(out,(uint8_t*)&an_int,sizeof(an_int));
+  }
+}
+
+// Frequency vs. settings:
+// for now, user still has to set the specifics, but at least teens
+// can figure out the frequency and report it.
+
+int Conductivity::real_freq_hz() {
+  // probably integer is good enough for frequency
+  // have to be a little careful about overflow, thus the specific
+  // ordering here:
+  return ((PDB_F0/BLOCKSIZE) * dac_per_adc*dac_out_stride)/pdb_period;
+}
+  
+
+/// HERE:
+// See if the above produces some binary crap in the
+// serial monitor.  May have to shift to python to see the
+// binary then.  yep.
+// check numbits() maybe to see if data is discarded? ?
+// data need a python ui to read this stuff in.

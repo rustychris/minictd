@@ -1,8 +1,14 @@
 #ifndef CONDUCTIVITY_H
 #define CONDUCTIVITY_H
 
+// 48 MHz
+#define PDB_F0 (44100*1087)
+
 class Conductivity {
 public:
+  bool log_full_scan;
+  bool log_reduced_scan;
+  
   Conductivity();
   
   void init();
@@ -27,10 +33,15 @@ public:
   void scan();
   void scan_dump();
   void scan_reduce();
+
+  int real_freq_hz();
   
   bool dispatch_command(const char *, const char *);
   void help();
 
+  void write_frame_info(Print &out);
+  void write_data(Print &out);
+  
   float reading; // would it be better for this to be a scaled int?
 };
 

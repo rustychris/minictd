@@ -19,3 +19,38 @@ SD Card next??
  - were there local modifications to any other parts of that code?
  - will try the 3rd party SdFat, which is what freebird used, and is supposed to be
    more up to date than the SD library.
+
+Seems that SD card is reading okay.
+
+Next steps:
+ [Log to SD card]
+ Log to console
+   -- would like a common interface for logging to SD or console.
+   -- console log should be human-readable, and parseable.
+   -- have to support flexible datatypes.
+   -- can/should the frequency calculation code be moved to the teensy side?
+
+What should the API for logging data look like then?
+ - could follow freebird, where a text block included a numpy dtype-like
+   description of the data
+ - for writing to SD,
+
+The various types of data:
+ - thermistor: ('temp_rtd','<i4')
+ - pressure:   ('temp_ms5803','<i4'), ('press_ms5803','<ms5803')
+ - battery     ('battery','<i4')
+ - conductivity, reduced ('cond','<i4')
+ - conductivity, spectrum
+     ('ref_mean','<i4',256/dac_out_stride)
+     ('ref_var','<i4',256/dac_out_stride)
+     ('cell_mean','<i4',256/dac_out_stride)
+     ('cell_var','<i4',256/dac_out_stride)
+     assuming we don't really need the dac data
+
+
+ Each class then needs to support a method to write its data format string,
+ and to write a binary representatino of that data to a stream.
+
+
+ Extend conductivity to log spectra
+ Use some spectra to evaluate best way to reduce to cond. value

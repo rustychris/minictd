@@ -1,3 +1,6 @@
 [submodule "firmware/libraries/SdFat"]
 	path = firmware/libraries/SdFat
 	url = https://github.com/greiman/SdFat.git
+[submodule "firmware/libraries/MS5803-14BA_Breakout"]
+	path = firmware/libraries/MS5803-14BA_Breakout
+	url = https://github.com/sparkfun/MS5803-14BA_Breakout.git

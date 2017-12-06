@@ -1,0 +1,5 @@
+Possible that the ms5803 is toast.  Could jumper in a standalone module
+and/or scope the leads to see what's up.
+
+But cond_spec got significantly farther.  Probably because it's using the
+"correct" i2c?
