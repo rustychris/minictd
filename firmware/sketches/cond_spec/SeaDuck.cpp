@@ -6,8 +6,11 @@
 #include "conductivity.h"
 #include "rtclock.h"
 #include "SdFunctions.h"
+#include "Sensor.h"
 
 ADC *adc=new ADC();
+
+IntervalTimer Timer;
 
 Pressure pressure;
 Conductivity cond;
@@ -74,10 +77,17 @@ void common_adc_init(void) {
 
 SeaDuck::SeaDuck() 
 {
+  sample_interval_us=50000; // 20 Hz
+
+  num_sensors=4;
+  sensors[0]=&pressure;
+  sensors[1]=&cond;
+  sensors[2]=&ntc;
+  sensors[3]=&clock;
+  
   pinMode(POWER_3V3_ENABLE_PIN,OUTPUT);
   digitalWrite(POWER_3V3_ENABLE_PIN,HIGH);
 }
-
 
  
 void SeaDuck::setup() {
@@ -95,23 +105,28 @@ void SeaDuck::setup() {
   common_adc_init();
 
   storage.init();
-  cond.init();
-  pressure.init();
-  ntc.init();
-  clock.init();
+
+  for(int i=0;i<num_sensors;i++){
+    sensors[i]->init();
+  }
 }
 
 void SeaDuck::dispatch_command() {
-  if ( cond.dispatch_command(cmd,cmd_arg) ) {
+  for(int i=0;i<num_sensors;i++) {
+    if( sensors[i]->dispatch_command(cmd,cmd_arg) )
+      return;
+  }
+  if ( storage.dispatch_command(cmd,cmd_arg) ) {
     return;
-  } else if ( pressure.dispatch_command(cmd,cmd_arg) ) {
-    return;
-  } else if ( storage.dispatch_command(cmd,cmd_arg) ) {
-    return;
-  } else if ( ntc.dispatch_command(cmd,cmd_arg) ) {
-    return;
-  } else if ( clock.dispatch_command(cmd,cmd_arg) ) {
-    return;
+  } else if ( strcmp("sample",cmd)==0 ) {
+    oneshot_sample();
+  } else if ( strcmp("sample_loop",cmd)==0 ) {
+    continuous_sample();
+  } else if ( strcmp("interval_us",cmd)==0 ) {
+    if(cmd_arg) {
+      sample_interval_us=atoi(cmd_arg);      
+    }
+    Serial.print("interval_us="); Serial.println(sample_interval_us);
   } else {
     Shell::dispatch_command();
   }
@@ -119,15 +134,86 @@ void SeaDuck::dispatch_command() {
 
 void SeaDuck::help() {
   Shell::help();
-  cond.help();
-  ntc.help();
-  clock.help();
+  Serial.println("    sample # one-shot sampling");
+  Serial.println("    interval_us[=NNNN] # sampling interval in usecs");
+  for(int i=0;i<num_sensors;i++ ) {
+    sensors[i]->help();
+  }
   storage.help();
-  pressure.help();
 }
-
 
 time_t SeaDuck::unixtime() {
   clock.read();
   return clock.reading_seconds;
+}
+
+void SeaDuck::oneshot_sample(void) {
+  Serial.print("[");
+  for(int i=0;i<num_sensors;i++ ) {
+    if ( sensors[i]->enabled ) {
+      sensors[i]->write_frame_info(Serial);
+    }
+  }
+  Serial.println("]");
+
+  for(int i=0;i<num_sensors;i++ ) {
+    if ( sensors[i]->enabled ) {
+      sensors[i]->read();
+      sensors[i]->write_data(Serial);
+    }
+  }
+  Serial.print("STOP\n"); // DBG trying to flush
+  Serial.flush(); // having trouble seeing any of that stuff above.
+}
+
+volatile int sample_flag=0;
+
+void timer_isr(void) {
+  cli();
+  sample_flag++;
+  sei();
+}
+
+void SeaDuck::continuous_sample(void) {
+  // Development:
+  // 3. Fire sampling from this interrupt
+  // 4. Get on to recording to SD
+
+  // best approach is to use another timer, like IntervalTimer, and
+  //   read the RTC to get timestamps.
+
+  // for starters, go for some set number of seconds
+  time_t t_start=Teensy3Clock.get();
+  long start,loop_time;
+
+  Serial.println("# Starting interval timer loop");
+  Timer.begin(timer_isr,sample_interval_us);
+
+  int my_sample=sample_flag;
+  
+  while ( Teensy3Clock.get() < t_start+5 ) {
+    // spin wait for next sample to get triggered:
+    // Should check to see if this is actually safe.
+    while( my_sample == sample_flag ) ;
+    start=millis();
+    my_sample++;
+    
+    // Serial.println("# fire");
+    oneshot_sample();
+    
+    // Allow stopping the loop on ! or ESC
+    if( Serial.available() ) {
+      uint8_t c=Serial.read();
+      // stop it when an exclamation or ESC is read
+      if ( (c=='!') || (c==27) ) {
+        loop_time=0;
+        break;
+      } 
+    }
+    loop_time=millis() - start;
+  }
+  Timer.end();
+  Serial.println("# Exiting interval timer loop. ");
+  Serial.print(loop_time);
+  Serial.println(" ms for last loop");
 }

@@ -30,11 +30,32 @@ void RTClock::help() {
   Serial.println("    rtc_watch  # check incrementing of RTC");
 }
 
+void printDigits(int digits) {
+ // utility function for digital clock display: prints preceding colon and leading 0
+ if (digits < 10)
+   Serial.print('0');
+ Serial.print(digits);
+}
+
 void RTClock::status() {
   read();
   Serial.print(reading_seconds);
   Serial.print(" ");
   Serial.println(reading_partial);
+  // Print out a nicer version of that:
+  Serial.print(year(reading_seconds));
+  Serial.print("-");
+  Serial.print(month(reading_seconds));
+  Serial.print("-");
+  Serial.print(day(reading_seconds));
+
+  Serial.print(" ");
+  printDigits(hour(reading_seconds));
+  Serial.print(":");
+  printDigits(minute(reading_seconds));
+  Serial.print(":");
+  printDigits(second(reading_seconds));
+  Serial.println();
 }
 
 void RTClock::watch() {
@@ -43,4 +64,13 @@ void RTClock::watch() {
     status();
     delay(100);
   }
+}
+
+void RTClock::write_frame_info(Print &out) {
+  out.print("('seconds','<i4'),('partial','<i4')");
+}
+
+void RTClock::write_data(Print &out) {
+  write_base16(out,(uint8_t*)(&reading_seconds),sizeof(reading_seconds));
+  write_base16(out,(uint8_t*)(&reading_partial),sizeof(reading_partial));
 }

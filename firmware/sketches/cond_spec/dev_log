@@ -51,6 +51,59 @@ The various types of data:
  Each class then needs to support a method to write its data format string,
  and to write a binary representatino of that data to a stream.
 
-
  Extend conductivity to log spectra
  Use some spectra to evaluate best way to reduce to cond. value
+
+
+One step higher level configuration:
+ Need it to be programmable roughly like the freebird
+
+ Freebird model:
+  reads commands either from the console or a text file
+  can set a sampling interval
+  data can be written to the console or to SD
+  the SD card has text blocks and data blocks.
+  text block includes a numpy-like header describing the data format.
+  Each time logging is started, a new file is created.
+  All sampling is done on timers "in the background" while writing to
+  SD and checking for console input is "in the foreground"
+
+ Will this work for the minictd?
+  For now, assume that something like 20 Hz is an upper bound on sampling.
+  Assume that all parameters are sampled on the same timeline.
+  Can enable or disable parameters from being logged.
+
+  seems like this all works out okay.
+  
+SeaDuck should now be fully converted over to Sensor class.
+
+Then on to timing of successive samples, writing binary to SD card, and
+reading commands from SD card.
+
+ - maybe this is a good time to have it run in the "background"?
+ - freebird had all of the sensor stuff as chained interrupts in the background.
+ - one significant motivation is that writing to SD has large and unpredictable
+   delays.
+
+What all has to happen during a sample?
+ - pressure sensor: a pair of I2C send, delay, read, then some math
+ - clock: basically reading a register
+ - temperature: set some ADC parameters, analogRead(), and some math
+ - conductivity: set some ADC, DAC, PDB registers, sine buffer,
+     wait for the counts to get up high enough,
+     maybe reduce the results.
+ - write all of those out.
+
+ With all of the stuff in conductivity, and the pain of settings up
+ asynchronous calls on all of these, why not put the SD card in the background,
+ and run the sampling in the foreground?
+
+ Look back at freebird for any hints of why this wasn't the route taken.
+
+ BUG: cannot call sample twice in a row?
+  - sample then scan also hangs
+  - multiple scan calls are okay.
+  - so sample leaves somebody in a state that causes a subsequent scan to fail.
+  - it's the thermistor.
+  - HERE must be in setting the averaging, or more likely something going on in analogRead().
+  

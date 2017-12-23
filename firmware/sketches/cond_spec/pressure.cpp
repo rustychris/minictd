@@ -10,8 +10,9 @@ void Pressure::init(){
   //Retrieve calibration constants for conversion math.
   sensor.reset();
   sensor.begin();
-  
-  pressure_baseline = sensor.getPressure(ADC_4096);
+
+  read();
+  pressure_baseline_dPa = pressure_abs_dPa;
 }
 
 void Pressure::read() {
@@ -22,25 +23,27 @@ void Pressure::read() {
   // ADC_2048
   // ADC_4096
     
-  // Read temperature from the sensor in deg C. 
-  temperature_c = sensor.getTemperature(CELSIUS, ADC_512);
-    
-  // Read pressure from the sensor in mbar.
-  pressure_abs = sensor.getPressure(ADC_4096);
-     
+  // Read temperature from the sensor in deg C.
+  sensor.getMeasurements(ADC_4096);
+
+  temperature_c100 = sensor._temperature_actual;
+
+  // 1 bar ~ 100kPa
+  // Read pressure from the sensor in mbar.  or is it tenths of Pa?
+  pressure_abs_dPa = sensor._pressure_actual;
 }
 
 void Pressure::display(){
   read();
   
   Serial.print("temp_ms5803==");
-  Serial.println(temperature_c);
+  Serial.println(temperature_c100 / 100.0f);
   
   Serial.print("press_abs_mbar=");
-  Serial.println(pressure_abs);
+  Serial.println(pressure_abs_dPa / 10.0f);
      
   Serial.print("press_delta_dbar=");
-  Serial.println( ( (pressure_abs-pressure_baseline)/100.0 ) ); 
+  Serial.println( ( (pressure_abs_dPa-pressure_baseline_dPa)/1000.0 ) ); 
 }
 
 bool Pressure::dispatch_command(const char *cmd, const char *cmd_arg) {
@@ -56,3 +59,14 @@ void Pressure::help() {
   Serial.println("  Pressure");
   Serial.println("    pressure  # report temp and pressure");
 }
+
+  
+void Pressure::write_frame_info(Print &out) {
+  out.print( "('pressure_dPa','<i4'),('temp_c100_ms5803','<i4'),");
+}
+
+void Pressure::write_data(Print &out){
+  write_base16(out,(uint8_t*)&pressure_abs_dPa,sizeof(pressure_abs_dPa));
+  write_base16(out,(uint8_t*)&temperature_c100,sizeof(temperature_c100));
+}
+

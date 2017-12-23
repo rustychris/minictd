@@ -2,6 +2,7 @@
 #include <DMAChannel.h> // used to be in quotes
 
 #include "SeaDuck.h"
+#include "Sensor.h"
 #include "conductivity.h"
 
 // Sequencing of ADC usage (for now, analog power bus is always on)
@@ -91,11 +92,11 @@ uint32_t adc1_variance[BLOCKSIZE];
 
 Conductivity::Conductivity() {
   // set some basic, sane settings
-  // DBG
-  // pdb_period=1025;
-  // dac_per_adc=2;
-  // adc_var_shift=4;
-  // adc_n=20;
+  pdb_period=150;
+  dac_per_adc=8;
+  adc_var_shift=4;
+  adc_n=20;
+  
   log_full_scan=true;
   log_reduced_scan=false;
 }
@@ -532,14 +533,15 @@ void Conductivity::dac_stop() {
 //   At return of this function, the reading will be
 //   underway.
 void Conductivity::scan_setup() {
-  Serial.println("# About to adc setup");
+  // interferes with hex output
+  // Serial.println("# About to adc setup");
   fill_sine_buffer();
 
   adc_setup();
   dac_setup();
   pdb_setup();  
 
-  Serial.println("# Setup complete");
+  // Serial.println("# Setup complete");
 }
 
 void Conductivity::scan_cleanup() {
@@ -552,13 +554,13 @@ void Conductivity::scan_cleanup() {
 //   Called after scan_setup(), to wait until reading is
 //   complete.
 void Conductivity::wait_for_scan() {
-  Serial.print("#");
+  // Serial.print("#");
   while( (adc0_n < adc_n) ||
          (adc1_n < adc_n) ) {
     delay(100);
-    Serial.print(".");
+    // Serial.print(".");
   }
-  Serial.println("done");
+  // Serial.println("done");
 }
 
 void Conductivity::scan_dump() {
@@ -621,7 +623,6 @@ void Conductivity::read() {
 
 void Conductivity::scan_reduce() {
   // HERE
-  reading=3.14159; // BOGUS
 }
 
 
@@ -774,7 +775,6 @@ void Conductivity::help() {
 void Conductivity::write_frame_info(Print &out)
 {
   // see dev_log
-  out.print("[");
   if ( log_full_scan ) {
     out.print( "('freq_hz','<i4'),('sample_count','<i4'),('shunt_mean','<i4',");
     out.print( buff_n_samples );
@@ -788,33 +788,6 @@ void Conductivity::write_frame_info(Print &out)
   }
   if ( log_reduced_scan ) {
     out.print( "('imp_real','<i4'),('imp_imag','<i4'),");
-  }
-  out.println("]");
-}
-
-uint8_t hexmap[]={'0','1','2','3','4','5','6','7',
-                  '8','9','A','B','C','D','E','F'};
-
-void write_base16(Print &out,uint8_t *buff,int count)
-{
-  static uint8_t hexbuff[121];
-
-  int i=0;
-  int pos=0;
-  
-  for(;i<count;i++) {
-    hexbuff[pos]  =hexmap[ (buff[i]>>4) & 0xF ];
-    hexbuff[pos+1]=hexmap[  buff[i]     & 0xF ];
-    pos+=2;
-    if( pos == 120 ) {
-      hexbuff[pos]='\n';
-      out.write(hexbuff,121);
-      pos=0;
-    }
-  }
-  if( pos > 0 ){
-    hexbuff[pos]='\n';
-    out.write(hexbuff,pos+1);
   }
 }
 
@@ -838,9 +811,6 @@ void Conductivity::write_data(Print &out)
     write_base16(out,(uint8_t*)adc1_variance,sizeof(adc1_variance[0])*buff_n_samples);
     write_base16(out,(uint8_t*)adc0_accum,sizeof(adc0_accum[0])*buff_n_samples);
     write_base16(out,(uint8_t*)adc0_variance,sizeof(adc0_variance[0])*buff_n_samples);
-    
-    out.print("STOP\n"); // DBG trying to flush
-    out.flush(); // having trouble seeing any of that stuff above.
   }
   
   if ( log_reduced_scan ) {

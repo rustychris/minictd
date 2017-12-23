@@ -1,21 +1,23 @@
 #ifndef PRESSURE_H
 #define PRESSURE_H
 
-class Pressure {
+#include "Sensor.h"
+
+class Pressure : public Sensor {
 public:
-  void init();
-  void read();
+  virtual void init();
+  virtual void read();
   void display();
   
-  bool dispatch_command(const char *cmd, const char *cmd_arg);
-  void help();
-
-  double pressure_baseline;
+  virtual bool dispatch_command(const char *cmd, const char *cmd_arg);
+  virtual void help();
+  virtual void write_frame_info(Print &out);
+  virtual void write_data(Print &out);
   
-  double pressure_abs;
-  float temperature_c;
+  int32_t pressure_baseline_dPa;
   
-  
+  int32_t pressure_abs_dPa;
+  int32_t temperature_c100;
 };
 
 #endif // PRESSURE_H

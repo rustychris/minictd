@@ -1,4 +1,5 @@
 // defines related to the board layout
+#define MAX_NUM_SENSORS 5
 
 #define CDRIVE1 11
 #define CDRIVE2 12

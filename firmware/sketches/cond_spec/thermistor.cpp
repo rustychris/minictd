@@ -12,7 +12,7 @@ void Thermistor::read() {
   float dratio;
   float R;
 
-  // HERE -- use direct acd programming, or at least compatible with
+  // use direct adc programming, or at least compatible with
   // SeaDuck.cpp
   adc->setAveraging(32,NTC_ADC);
 
@@ -39,19 +39,19 @@ void Thermistor::read() {
   // 1/dratio -1 = Rntc/Rref
   R= NTC_R_REF*(1/dratio -1);
   
-  Serial.print("# [Temp] bridge counts: ");
-  Serial.print(dbridge);
-  Serial.print("  mV: ");
-  Serial.print( 3.3*1000*dratio );
-  Serial.print("  R(ohm): ");
-  Serial.print(R);
+  // Serial.print("# [Temp] bridge counts: ");
+  // Serial.print(dbridge);
+  // Serial.print("  mV: ");
+  // Serial.print( 3.3*1000*dratio );
+  // Serial.print("  R(ohm): ");
+  // Serial.print(R);
 
   //fiction!
   reading=23.0 - (R-108000)*0.0005;
-  Serial.print(" T(degC): ");
-  Serial.print(reading);
-  
-  Serial.println("");
+  // Serial.print(" T(degC): ");
+  // Serial.print(reading);
+  // 
+  // Serial.println("");
 }
 
 bool Thermistor::dispatch_command(const char *cmd, const char *cmd_arg) {
@@ -68,4 +68,12 @@ bool Thermistor::dispatch_command(const char *cmd, const char *cmd_arg) {
 void Thermistor::help() {
   Serial.println("  Thermistor");
   Serial.println("    temperature  # read the thermistor and print the result");
+}
+
+void Thermistor::write_frame_info(Print &out) {
+  out.print("('temp_ntc','<f4')");
+}
+
+void Thermistor::write_data(Print &out) {
+  write_base16(out,(uint8_t*)(&reading),sizeof(reading));
 }

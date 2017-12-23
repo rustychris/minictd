@@ -8,12 +8,16 @@
 #include "Shell.h"
 #include <TimeLib.h>
 
+#include "Sensor.h"
+
 #include "seaduck_cfg.h"
 
 extern ADC *adc;
 
 class SeaDuck : public Shell
 {
+  uint32_t sample_interval_us;
+  
 public:
   // mostly globals, to lessen the pain of access from ISR
   SeaDuck(); 
@@ -22,12 +26,18 @@ public:
   virtual void dispatch_command();
   virtual void help();
 
-  void scan();
-  void scan_setup();
-  void scan_loop();
-  void scan_cleanup();
+  // void scan();
+  // void scan_setup();
+  // void scan_loop();
+  // void scan_cleanup();
 
-  time_t unixtime(); 
+  Sensor *sensors[MAX_NUM_SENSORS];
+  int num_sensors;
+
+  time_t unixtime();
+
+  void oneshot_sample();
+  void continuous_sample();
 };
 
 extern SeaDuck logger;
