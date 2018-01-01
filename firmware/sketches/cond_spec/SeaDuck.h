@@ -26,11 +26,6 @@ public:
   virtual void dispatch_command();
   virtual void help();
 
-  // void scan();
-  // void scan_setup();
-  // void scan_loop();
-  // void scan_cleanup();
-
   Sensor *sensors[MAX_NUM_SENSORS];
   int num_sensors;
 

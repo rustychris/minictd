@@ -104,6 +104,8 @@ void SeaDuck::setup() {
   Serial.println("SeaDuck setup");
   common_adc_init();
 
+  binary_format=BIN_HEX;
+  
   storage.init();
 
   for(int i=0;i<num_sensors;i++){
@@ -148,6 +150,7 @@ time_t SeaDuck::unixtime() {
 }
 
 void SeaDuck::oneshot_sample(void) {
+  
   Serial.print("[");
   for(int i=0;i<num_sensors;i++ ) {
     if ( sensors[i]->enabled ) {
@@ -155,14 +158,15 @@ void SeaDuck::oneshot_sample(void) {
     }
   }
   Serial.println("]");
-
+  long start,loop_time;
+  
   for(int i=0;i<num_sensors;i++ ) {
     if ( sensors[i]->enabled ) {
       sensors[i]->read();
       sensors[i]->write_data(Serial);
     }
   }
-  Serial.print("STOP\n"); // DBG trying to flush
+  Serial.print("STOP\n"); 
   Serial.flush(); // having trouble seeing any of that stuff above.
 }
 
@@ -191,26 +195,25 @@ void SeaDuck::continuous_sample(void) {
 
   int my_sample=sample_flag;
   
-  while ( Teensy3Clock.get() < t_start+5 ) {
+  while ( Teensy3Clock.get() < t_start+2 ) {
     // spin wait for next sample to get triggered:
     // Should check to see if this is actually safe.
     while( my_sample == sample_flag ) ;
     start=millis();
     my_sample++;
     
-    // Serial.println("# fire");
     oneshot_sample();
-    
+
+    loop_time=millis() - start;
+
     // Allow stopping the loop on ! or ESC
     if( Serial.available() ) {
       uint8_t c=Serial.read();
       // stop it when an exclamation or ESC is read
       if ( (c=='!') || (c==27) ) {
-        loop_time=0;
         break;
       } 
     }
-    loop_time=millis() - start;
   }
   Timer.end();
   Serial.println("# Exiting interval timer loop. ");

@@ -6,12 +6,15 @@
 void Thermistor::init() {
   pinMode(NTC_SENSE,INPUT);
 }
+int dbridge;
 
 void Thermistor::read() {
-  int dbridge;
   float dratio;
   float R;
 
+  // debugging hang - try saving state
+  // that didn't help
+  
   // use direct adc programming, or at least compatible with
   // SeaDuck.cpp
   adc->setAveraging(32,NTC_ADC);
@@ -59,6 +62,12 @@ bool Thermistor::dispatch_command(const char *cmd, const char *cmd_arg) {
     read();
     Serial.print("temperature=");
     Serial.println(reading);
+  } else if ( strcmp(cmd,"temperature_enable")==0 ) {
+    if(cmd_arg) {
+      enabled=(bool)atoi(cmd_arg);
+    } else {
+      Serial.print("temperature_enable="); Serial.println( enabled );
+    }
   } else {
     return false;
   }
@@ -68,12 +77,14 @@ bool Thermistor::dispatch_command(const char *cmd, const char *cmd_arg) {
 void Thermistor::help() {
   Serial.println("  Thermistor");
   Serial.println("    temperature  # read the thermistor and print the result");
+  Serial.println("    temperature_enable[=0,1] # enable/disable");
 }
 
 void Thermistor::write_frame_info(Print &out) {
-  out.print("('temp_ntc','<f4')");
+  out.print("('temp_ntc','<f4'),('temp_counts','<i4'),");
 }
 
 void Thermistor::write_data(Print &out) {
   write_base16(out,(uint8_t*)(&reading),sizeof(reading));
+  write_base16(out,(uint8_t*)(&dbridge),sizeof(dbridge));
 }

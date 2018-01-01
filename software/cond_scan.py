@@ -16,7 +16,7 @@ sdc=device.SeaDuckComm()
 sdc.connect()
 sdc.enter_command_mode(timeout=10)
 
-print sdc.send('scan_period',timeout=2)
+print sdc.send('cond_period',timeout=2)
 sdc.disconnect()
 
 ##
@@ -151,7 +151,7 @@ class Scan(object):
         if self.debug:
             print "Fake scan"
             with open("../sketches/cond_spec/data1.csv") as fp:
-                self.scan_response = ["scan"] + fp.readlines()
+                self.scan_response = ["cond_scan"] + fp.readlines()
             self.real_freq_hz=self.freq_hz
         else:
             temp_connect=not self.sdc.connected
@@ -159,16 +159,16 @@ class Scan(object):
                 self.sdc.connect()
                 self.sdc.enter_command_mode(timeout=10)
             try:
-                self.sdc.send('scan_period=%d'%self.pdb_period,20)
-                print self.sdc.send('stride=%d'%self.dac_stride,20)
-                print self.sdc.send('dac_oversample=%d'%self.dac_oversample,20)
-                self.sdc.send('n_loops=%d'%self.n_loops,20)
-                self.sdc.send('dac_shift=%d'%self.dac_shift)
-                self.sdc.send('dac_mid=%d'%self.dac_mid)
-                self.sdc.send('n_discard=%d'%self.n_discard)
+                self.sdc.send('cond_period=%d'%self.pdb_period,20)
+                print self.sdc.send('cond_stride=%d'%self.dac_stride,20)
+                print self.sdc.send('cond_dac_oversample=%d'%self.dac_oversample,20)
+                self.sdc.send('cond_n_loops=%d'%self.n_loops,20)
+                self.sdc.send('cond_dac_shift=%d'%self.dac_shift)
+                self.sdc.send('cond_dac_mid=%d'%self.dac_mid)
+                self.sdc.send('cond_n_discard=%d'%self.n_discard)
 
                 print "Scanning..."
-                self.scan_response=self.sdc.send('scan',timeout=10)
+                self.scan_response=self.sdc.send('cond_scan',timeout=10)
             finally:
                 if temp_connect:
                     self.sdc.disconnect()
@@ -317,7 +317,7 @@ class Scan(object):
 
 ##         
 if 1:
-    sc=Scan(sdc,2000,dac_shift=4,dac_mid=2048,auto_range=True)
+    sc=Scan(sdc,20000,dac_shift=4,dac_mid=2048,auto_range=True)
     sc.n_loops=20
     sc.n_discard=3
     sc.run()
@@ -325,11 +325,12 @@ if 1:
     # 50kHz => actual 47181, pdb_period=127, dac_oversample=32
 ## 
 
+# With lots of wire but no water, gets 8k with -50deg phase.
 sc.figure_waveform(3,reps=1,delta=False)
 
 ##
 # Get all the settings in place:
-sc=Scan(sdc,2000,dac_shift=4,dac_mid=2048,auto_range=True)
+sc=Scan(sdc,20000,dac_shift=4,dac_mid=2048,auto_range=True)
 sc.n_loops=10
 sc.n_discard=3
 sc.run()
@@ -343,9 +344,9 @@ shunt_line=ax.plot(sc.result['shunt_mean'],'r')[0]
 
 sc.sdc.connect()
 try:
-    for i in range(10):
+    for i in range(500):
         t=time.time()
-        scan_response=sc.sdc.send('scan',timeout=10)
+        scan_response=sc.sdc.send('cond_scan',timeout=10)
         scan_time=time.time() - t
         result=read_bin(scan_response[1:])[0]
         t=time.time()
@@ -462,3 +463,80 @@ sweep=Sweep(sdc,500,108000,60)
 sweep.run()
 sweep.figure_bode(1)
 sweep.figure_nyquist(2)
+
+##
+N=100
+buff=np.zeros((N,2),'f8')
+
+# Similar, but for temperature:
+plt.figure(1).clf()
+fig,ax=plt.subplots(1,num=1)
+
+ntc_line=ax.plot(buff[:,0],'b')[0]
+ms5803_line=ax.plot(buff[:,1],'r')[0]
+ax.axis(ymin=22,ymax=28)
+
+
+sdc.connect()
+sdc.enter_command_mode(timeout=10)
+
+try:
+    sdc.send('cond_enable=0',timeout=5)
+    sdc.send('pressure_enable=1',timeout=2)
+    sdc.send('temperature_enable=1')
+
+    for i in range(100):
+        response=sdc.send('sample',timeout=2)
+        result=read_bin(response[1:])[0]
+        print "NTC: %.3f (%6d)  MS5803: %.3f"%(result['temp_ntc'],result['temp_counts'],
+                                         0.01*result['temp_c100_ms5803'])
+        buff[:-1] = buff[1:]
+        buff[-1,0]=result['temp_ntc']
+        buff[-1,1]=0.01*result['temp_c100_ms5803']
+
+        ntc_line.set_ydata(buff[:,0])
+        ms5803_line.set_ydata(buff[:,1])
+        plt.pause(0.001)
+finally:
+    sdc.disconnect()
+
+##
+
+# and pressure
+N=1000
+buff=np.zeros((N,1),'f8')*np.nan
+
+plt.figure(1).clf()
+fig,ax=plt.subplots(1,num=1)
+
+x=np.arange(0,0+len(buff))
+
+press_line=ax.plot(x,buff[:,0],'b')[0]
+ax.axis(ymin=22500,ymax=24000)
+
+sdc.connect()
+sdc.enter_command_mode(timeout=10)
+
+try:
+    sdc.send('cond_enable=0',timeout=5)
+    sdc.send('pressure_enable=1',timeout=2)
+    sdc.send('temperature_enable=1')
+
+    for i in range(5000):
+        response=sdc.send('sample',timeout=2)
+        result=read_bin(response[1:])[0]
+        #print "NTC: %.3f (%6d)  MS5803: %.3f"%(result['temp_ntc'],result['temp_counts'],
+        #                                 0.01*result['temp_c100_ms5803'])
+        buff[:-1] = buff[1:]
+        buff[-1,0]=result['pressure_dPa']
+
+        x=np.arange(i,i+len(buff))
+        press_line.set_ydata(buff[:,0])
+        press_line.set_xdata(x)
+
+        ax.axis(ymin=np.nanmean(buff)-500,ymax=np.nanmean(buff)+500,
+                xmin=x[0],xmax=x[-1])
+        
+        plt.pause(0.008)
+finally:
+    sdc.disconnect()

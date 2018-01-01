@@ -67,7 +67,7 @@ void RTClock::watch() {
 }
 
 void RTClock::write_frame_info(Print &out) {
-  out.print("('seconds','<i4'),('partial','<i4')");
+  out.print("('seconds','<i4'),('partial','<i4'),");
 }
 
 void RTClock::write_data(Print &out) {

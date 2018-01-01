@@ -105,5 +105,121 @@ What all has to happen during a sample?
   - multiple scan calls are okay.
   - so sample leaves somebody in a state that causes a subsequent scan to fail.
   - it's the thermistor.
-  - HERE must be in setting the averaging, or more likely something going on in analogRead().
-  
+  - It was the averaging.  Averaging screws up the cond. stuff.  Now force that to no averaging.
+
+ FIXED.
+
+ Sample_loop takes 131ms.  Needs to be more like 50ms.
+ Doesn't appear to depend on the number of cond. loops?
+ 
+ At 20kHz, that's 50us per cycle.  10 cycles 500us.
+
+ Moving the Serial.available() out of the timing makes no difference.
+ Not writing the output?  131 => 124ms
+
+  sensor 0: 22ms  - pressure
+  sensor 1: 101ms - conductivity.  wahn wah
+  sensor 2: 0ms - ntc
+  sensor 3: 0ms - rtc
+
+Ah - there was a 100ms delay loop in conductivity.
+Dropping that to 5ms, total loop time (no output) is 43ms.
+
+That's 20 loops at 10kHz.
+DAC oversample is 8.
+So I think that's actually 20*8 cycles, so 16ms.
+Yep - 21ms outside pressure sensor, 16ms min. time,
+plus 5ms slop
+
+(pressure abs mbar reading 2220)
+
+Easy to get this down to 30ms with n_loops=10, so 30 Hz sampling
+is well within reach and well beyond initial applications.
+
+Plotting temp time series - seems like it may have some stability
+problems, not sure.  NTC has nice response, but maybe is topping
+out at 27.6?
+
+
+How to log to SD?
+ - easiest is to just log hex to SD, at a 2x performance loss.
+ - maybe better is to have a global flag for sensors that can be set
+   to binary or hex
+ - if writing binary, how can it be made parseable?  we can make sure
+   that only full frames are written out, but there has to be a way to
+   mark that there is or isn't another frame.  or does there?  for
+   console output that's a potential issue, but for writing to SD
+   it should just be frames of the same format all the way to the end.
+   though it would be nice to be able to intersperse another frame.
+   Rather than getting too deep into how to do this, maybe better to
+   default to HEX output for now, and only worry about doing something
+   fancy with binary if bandwidth or storage space becomes an issue.
+
+
+So the real fun part is the SD buffer handling.  Assume there is no a priori
+reason why SD can't be handled asynchronously, and sampling is synchronous.
+
+What parts of Storage.cpp have to changed to get asynchronous?  First, what is
+the API for this?
+
+ seems like SdFile myFile.write()
+ is a key async target.  unfortunately it's buried in loop()
+ .sync() also likely needs it
+
+This turns out to be quite an issue.  The SdFat guy (Bill Greiman) has
+made it clear that there will not be an SdFat which happily does its
+work asynchronously.
+
+This leaves two options:
+ a) some form of threading, whether RTOS or a simpler layer
+   TeensyThreading:
+     this sounds promising.  they do note that since libraries are
+     not generally thread-safe, each library should either be limited
+     to a specific thread, or access to that library guarded by locks.
+
+     The sampling code uses...
+       ADC: should be no problem
+       DMA  ?
+       I2C (i2c_t3) for ms5803.
+       rtclock
+     SdFat uses ...
+       SPI - seems to be about all.
+ ideally there would be a way to have threading where the sampling
+ thread is cooperative multitasking, and the SD thread is preemptive threading.
+ that doesn't seem easy.
+       
+ b) rewrite the sampling code to be asynchronous, just like freebird.
+    probably have to use my patched Wire library, or see if PJRC
+    has something nicer.
+    freebird code was more hardcoded in how the events cascaded.
+    to be more flexible, would want a mechanism for each sensor or
+    task to register the sequence of functions to call.  then
+    in each of those functions, it just needs to be able to find
+    out the function pointer for the next function.
+
+ This seems the most promising.  i2c_t3 has support for async usage.
+
+ Say the order is pressure, cond, ntc, clock, battery.
+
+ pressure: have to make the ms5803 library async, a bit of a pain.
+   sendCommand(CMD_ADC_CONV), waits up to 11ms
+   sendCommand(CMD_ADC_READ), reads maybe 3 bytes
+
+ the way to use threads of some flavor I guess would be that rather than
+ breaking the code up into 20 bite-sized chunks, splitting single functions
+ into awkward pieces, the functions would run in a thread, and on calling
+ yield() control would jump back to the ISR.  the next time the ISR gets
+ called, it jumps back into the thread.
+
+ so the SD code doesn't really run in a thread, it's just doing it's thing.
+ the trick is that the sampling code is all run in a thread, and that it's
+ possible to call into that thread from an ISR, and de-schedule that
+ thread (yield()?) from within the thread.  but the teensythreads code
+ explicitly states that context switches will abort when called inside
+ an interrupt.
+
+ Okay - no free lunches out there.
+ But rather than hard-coding the order, let's have a stack of functions
+ and objects
+
+ 

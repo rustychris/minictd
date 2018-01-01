@@ -256,6 +256,10 @@ void Conductivity::adc0_setup(void) {
   // adc check?
   ADC0_SC2 |= ADC_SC2_ADTRG | ADC_SC2_DMAEN;
 
+  // no averaging.  Assumes no cal is ongoing.  Without this, ntc may alter averaging
+  // and this code will hang.
+  ADC0_SC3 = 0; 
+  
   // ---- The rest is DMA ----
   
   // source of the data
@@ -315,6 +319,10 @@ void Conductivity::adc1_setup(void) {
   ADC1_SC1A = 0 + ADC_SC1_DIFF; // (1<<5); // set differential
 
   ADC1_SC2 |= ADC_SC2_ADTRG | ADC_SC2_DMAEN;
+  // no averaging.  Assumes no cal is ongoing.  Without this, ntc may alter averaging
+  // and this code will hang.
+  ADC1_SC3 = 0;
+  
     
   adc1_dma.TCD->SADDR = &ADC1_RA;
   adc1_dma.TCD->SOFF = 0;
@@ -557,15 +565,17 @@ void Conductivity::wait_for_scan() {
   // Serial.print("#");
   while( (adc0_n < adc_n) ||
          (adc1_n < adc_n) ) {
-    delay(100);
-    // Serial.print(".");
+    delay(1);
   }
-  // Serial.println("done");
 }
 
 void Conductivity::scan_dump() {
+  Serial.print("[");
   write_frame_info(Serial);
+  Serial.println("]");
   write_data(Serial);
+  Serial.println("");
+  Serial.println("STOP");
   return;
 
   
@@ -612,13 +622,13 @@ void Conductivity::scan() {
 //   Generic interface for SeaDuck, setup-to-cleanup scan,
 //   reducing the values to a conductivity value.
 void Conductivity::read() {
-  scan_setup();
+  scan_setup(); // 1ms
 
-  wait_for_scan();
+  wait_for_scan(); // 100 ms
 
   scan_reduce();
   
-  scan_cleanup();
+  scan_cleanup(); // 0 ms
 }
 
 void Conductivity::scan_reduce() {
@@ -627,9 +637,15 @@ void Conductivity::scan_reduce() {
 
 
 bool Conductivity::dispatch_command(const char *cmd, const char *cmd_arg) {
-  if ( strcmp(cmd,"scan")==0 ) {
+  if ( strcmp(cmd,"cond_scan")==0 ) {
     scan();
-  } else if ( strcmp(cmd,"scan_period")==0 ) {
+  } else if ( strcmp(cmd,"cond_enable")==0 ) {
+    if(cmd_arg) {
+      enabled=(bool)atoi(cmd_arg);
+    } else {
+      Serial.print("cond_enable="); Serial.println( enabled );
+    }
+  } else if ( strcmp(cmd,"cond_period")==0 ) {
     if(cmd_arg) {
       int32_t new_period=atoi(cmd_arg);
       uint8_t new_prescaler=0;
@@ -651,9 +667,9 @@ bool Conductivity::dispatch_command(const char *cmd, const char *cmd_arg) {
         pdb_period=new_period;
       }
     } else {
-      Serial.print("scan_period="); Serial.println( pdb_period*(1<<pdb_prescaler) );
+      Serial.print("cond_period="); Serial.println( pdb_period*(1<<pdb_prescaler) );
     }
-  } else if ( strcmp(cmd,"dac_oversample")==0) {
+  } else if ( strcmp(cmd,"cond_dac_oversample")==0) {
     if(cmd_arg) {
       int new_oversample=(int16_t)atoi(cmd_arg);
       if ( (new_oversample < 1)
@@ -664,9 +680,9 @@ bool Conductivity::dispatch_command(const char *cmd, const char *cmd_arg) {
         dac_per_adc=new_oversample;
       }
     } else {
-      Serial.print("dac_oversample="); Serial.println(dac_per_adc);
+      Serial.print("cond_dac_oversample="); Serial.println(dac_per_adc);
     }
-  } else if ( strcmp(cmd,"stride")==0) {
+  } else if ( strcmp(cmd,"cond_stride")==0) {
     if(cmd_arg) {
       int new_stride=(int16_t)atoi(cmd_arg);
       if ( (new_stride < 1)
@@ -677,11 +693,11 @@ bool Conductivity::dispatch_command(const char *cmd, const char *cmd_arg) {
         dac_out_stride=new_stride;
       }
     } else {
-      Serial.print("stride="); Serial.println(dac_out_stride);
+      Serial.print("cond_stride="); Serial.println(dac_out_stride);
     }
-  } else if (strcmp(cmd,"dac_status")==0) {
+  } else if (strcmp(cmd,"cond_dac_status")==0) {
     dac_status();
-  } else if ( strcmp(cmd,"n_discard")==0) {
+  } else if ( strcmp(cmd,"cond_n_discard")==0) {
     if(cmd_arg) {
       int new_discard=(int16_t)atoi(cmd_arg);
       if ( (new_discard < 0)
@@ -691,11 +707,11 @@ bool Conductivity::dispatch_command(const char *cmd, const char *cmd_arg) {
         adc_n_discard=new_discard;
       }
     } else {
-      Serial.print("n_discard="); Serial.println(adc_n_discard);
+      Serial.print("cond_n_discard="); Serial.println(adc_n_discard);
     }
   }
   // new way - set loop count directly.
-  else if ( strcmp(cmd,"n_loops")==0 ) {
+  else if ( strcmp(cmd,"cond_n_loops")==0 ) {
     if (cmd_arg) {
       int new_n_loops=(int16_t)atoi(cmd_arg);
       if ( (new_n_loops<1) ||
@@ -709,10 +725,10 @@ bool Conductivity::dispatch_command(const char *cmd, const char *cmd_arg) {
         while( (4<<adc_var_shift) < adc_n ) adc_var_shift++;
       }
     } else {
-      Serial.print("n_loops="); Serial.println(adc_n);
+      Serial.print("cond_n_loops="); Serial.println(adc_n);
     }
   }
-  else if ( strcmp(cmd,"dac_shift")==0) {
+  else if ( strcmp(cmd,"cond_dac_shift")==0) {
     if(cmd_arg) {
       int new_shift=(uint16_t)atoi(cmd_arg);
       if ( (new_shift < 0) || (new_shift>15 ) ) {
@@ -721,24 +737,24 @@ bool Conductivity::dispatch_command(const char *cmd, const char *cmd_arg) {
         dac_shift=new_shift;
       }
     } else {
-      Serial.print("dac_shift="); Serial.println(dac_shift);
+      Serial.print("cond_dac_shift="); Serial.println(dac_shift);
     }
-  } else if ( strcmp(cmd,"log_cond_scan")==0 ) {
+  } else if ( strcmp(cmd,"cond_log_scan")==0 ) {
     if ( cmd_arg ) {
       log_full_scan=(cmd_arg[0]=='1');
     }
-    Serial.print("log_cond_scan=");
+    Serial.print("cond_log_scan=");
     Serial.println(log_full_scan?'1':'0');
-  } else if ( strcmp(cmd,"log_cond_reduced")==0 ) {
+  } else if ( strcmp(cmd,"cond_log_reduced")==0 ) {
     if ( cmd_arg ) {
       log_reduced_scan=(cmd_arg[0]=='1');
     }
-    Serial.print("log_cond_reduced=");
+    Serial.print("cond_log_reduced=");
     Serial.println(log_reduced_scan?'1':'0');
-  } else if ( strcmp(cmd,"freq")==0 ) {
+  } else if ( strcmp(cmd,"cond_freq")==0 ) {
     Serial.print("freq=");
     Serial.println(real_freq_hz());
-  } else if ( strcmp(cmd,"dac_mid")==0) {
+  } else if ( strcmp(cmd,"cond_dac_mid")==0) {
     if(cmd_arg) {
       uint16_t new_mid=(uint16_t)atoi(cmd_arg);
       if ( (new_mid < 0) || (new_mid>4095 ) ) {
@@ -747,7 +763,7 @@ bool Conductivity::dispatch_command(const char *cmd, const char *cmd_arg) {
         dac_mid=dac_mid;
       }
     } else {
-      Serial.print("dac_mid="); Serial.println(dac_mid);
+      Serial.print("cond_dac_mid="); Serial.println(dac_mid);
     }
   } else {
     return false;
@@ -757,18 +773,19 @@ bool Conductivity::dispatch_command(const char *cmd, const char *cmd_arg) {
 
 void Conductivity::help() {
   Serial.println("  Conductivity cell");
-  Serial.println("    scan  # run a transfer function scan");
-  Serial.println("    scan_period[=NNNN] # set the speed of the scan");
-  Serial.println("    dac_stride[=1,2,4,8,...] # shorten waveform");
-  Serial.println("    dac_oversample[=1,2,4,8,16] # oversample DAC");
-  Serial.println("    accum_shift[=0..6] # average over 4*2^N loops");
-  Serial.println("    dac_shift[=0..15] # scaling of wave table");
-  Serial.println("    dac_mid[=0..4095] # center point for dac output");
-  Serial.println("    n_loops[=1..1000] # number of averaging loops");
-  Serial.println("    freq              # calculate drive frequency");
-  Serial.println("    dac_status # diagnostic printout ");
-  Serial.println("    log_cond_scan[=0,1] # disable/enable full scan output");
-  Serial.println("    log_cond_reduced[=0,1] # ...  reduced scan output");
+  Serial.println("    cond_enable[=0,1] # enable/disable" );
+  Serial.println("    cond_scan  # run a transfer function scan");
+  Serial.println("    cond_period[=NNNN] # set the speed of the scan");
+  Serial.println("    cond_stride[=1,2,4,8,...] # shorten waveform");
+  Serial.println("    cond_dac_oversample[=1,2,4,8,16] # oversample DAC");
+  Serial.println("    cond_dac_shift[=0..15] # scaling of wave table");
+  Serial.println("    cond_dac_mid[=0..4095] # center point for dac output");
+  Serial.println("    cond_n_loops[=1..1000] # number of averaging loops");
+  Serial.println("    cond_n_discard[=1..1000] # do not log first N loops");
+  Serial.println("    cond_freq              # calculate drive frequency");
+  Serial.println("    cond_dac_status # diagnostic printout ");
+  Serial.println("    cond_log_scan[=0,1] # disable/enable full scan output");
+  Serial.println("    cond_log_reduced[=0,1] # ...  reduced scan output");
 }
 
 

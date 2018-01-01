@@ -49,6 +49,12 @@ void Pressure::display(){
 bool Pressure::dispatch_command(const char *cmd, const char *cmd_arg) {
   if ( !strcmp(cmd,"pressure") ) {
     display();
+  } else if ( strcmp(cmd,"pressure_enable")==0 ) {
+    if(cmd_arg) {
+      enabled=(bool)atoi(cmd_arg);
+    } else {
+      Serial.print("pressure_enable="); Serial.println( enabled );
+    }
   } else {
     return false;
   }
@@ -58,6 +64,7 @@ bool Pressure::dispatch_command(const char *cmd, const char *cmd_arg) {
 void Pressure::help() {
   Serial.println("  Pressure");
   Serial.println("    pressure  # report temp and pressure");
+  Serial.println("    pressure_enable[=0,1] # enable/disable ");
 }
 
   

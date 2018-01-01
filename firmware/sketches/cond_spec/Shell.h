@@ -26,10 +26,7 @@ protected:
 
   // uint8_t frame[MAX_FRAME_BYTES];
   // uint8_t frame_pos;
-  // storage_interval assumed to be every sample
 
-  // instead of log_adc, log_imu, each device has an enabled setting of its own.
-  
 public:
   Shell(void) {
     cmd_filename[0]='\0';
@@ -42,8 +39,6 @@ public:
   void command_setup(void) {};
   void command_loop(void);
   void command_cleanup(void) {};
-
-  // ? maybe not needed? volatile uint32_t storage_counter;
 
   // if fname exists, it will be activated as the source for
   // subsequent calls to get_next_command(), until end of file is
