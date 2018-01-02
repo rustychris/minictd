@@ -1,4 +1,4 @@
-#include <i2c_t3.h>
+#include "i2c_t3.h"
 
 #include "SeaDuck.h"
 #include "pressure.h"
@@ -158,7 +158,6 @@ void SeaDuck::oneshot_sample(void) {
     }
   }
   Serial.println("]");
-  long start,loop_time;
   
   for(int i=0;i<num_sensors;i++ ) {
     if ( sensors[i]->enabled ) {

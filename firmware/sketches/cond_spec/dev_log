@@ -222,4 +222,13 @@ This leaves two options:
  But rather than hard-coding the order, let's have a stack of functions
  and objects
 
- 
+
+1. Is there a way to get an interrupt instead of a delay in the ms5803 code?
+   Currently it computes a delay of some milliseconds.  up to 9ms.
+
+2. Break up the ms5803 code to make separate calls for each
+   synchronous block of code
+
+  - compiles, ready to test and debug
+
+3. Queue those calls and work through the casting bits

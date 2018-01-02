@@ -5,7 +5,7 @@
 #include <SPI.h>
 #include <SdFat.h>
 
-#include <i2c_t3.h>
+#include "i2c_t3.h"
 #include <TimeLib.h>
 
 #include <ADC.h>

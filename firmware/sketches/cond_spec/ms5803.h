@@ -33,6 +33,9 @@ Distributed as-is; no warranty is given.
 
 #include <Arduino.h>
 
+// bastardizing Sensor to allow calls to member functions
+#include "Sensor.h"
+
 // Define units for conversions. 
 enum temperature_units
 {
@@ -72,31 +75,51 @@ enum ms5803_addr
 #define CMD_PROM 0xA0 // Coefficient location
 
 
-class MS5803
+class MS5803 : public Sensor
 {
-  public: 
-    MS5803(ms5803_addr address); 
-    void reset(void);  //Reset device
-    uint8_t begin(void); // Collect coefficients from sensor
-    
-    // Return calculated temperature from sensor
-    float getTemperature(temperature_units units, precision _precision);
-    // Return calculated pressure from sensor
-    float getPressure(precision _precision);
+public: 
+  MS5803(ms5803_addr address); 
+  void reset(void);  //Reset device
+  uint8_t begin(void); // Collect coefficients from sensor
+  
+  // Return calculated temperature from sensor
+  float getTemperature(temperature_units units, precision _precision);
+  // Return calculated pressure from sensor
+  float getPressure(precision _precision);
 
   int32_t _temperature_actual; // as hundredths of deg C.
   int32_t _pressure_actual; // as tenths of Pa
   void getMeasurements(precision _precision);
+
+  void async_getMeasurements(precision _temp_precision,precision _press_precision);
+  void async_getADC_temp(void);
+  void async_getADC_press(void);
+  void async_conversion(uint8_t flags);
+  void async_sendRead(void);
+  void async_request_three(void);
+  void async_readTemp(void);
+  void async_readPress(void);
+  void async_raw_to_actual(void);
   
-  private:
-    
-    ms5803_addr _address;     // Variable used to store I2C device address.
-    uint16_t coefficient[8];// Coefficients;
+  void raw_to_actual(void);
+  
+private:
+  
+  ms5803_addr _address;     // Variable used to store I2C device address.
+  uint16_t coefficient[8];// Coefficients;
 
-    void sendCommand(uint8_t command);  // General I2C send command function
-    uint32_t getADCconversion(measurement _measurement, precision _precision);  // Retrieve ADC result
+  precision temp_precision;
+  precision press_precision;
 
-    void sensorWait(uint8_t time); // General delay function see: delay()
+  // the most recent measurements
+  int32_t temperature_raw;
+  int32_t pressure_raw;
+  
+  void sendCommand(uint8_t command);  // General I2C send command function
+  uint32_t getADCconversion(measurement _measurement, precision _precision);  // Retrieve ADC result
+  
+  void sensorWait(uint8_t time); // General delay function see: delay()
+
 };
 
 #endif

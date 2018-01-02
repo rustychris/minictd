@@ -34,3 +34,5 @@
 #define DATAFILETEMPLATE "DATAxxxx.BIN"
 #define STREAM_START_LINE "$"
 #define MONITOR_START_LINE "#"
+
+#define SPI_SPEED SD_SCK_MHZ(4)

@@ -16,15 +16,21 @@ void Pressure::init(){
 }
 
 void Pressure::read() {
-  // To measure to higher degrees of precision use the following sensor settings:
-  // ADC_256 
-  // ADC_512 
-  // ADC_1024
-  // ADC_2048
-  // ADC_4096
-    
-  // Read temperature from the sensor in deg C.
-  sensor.getMeasurements(ADC_4096);
+  // Old way - works, but synchronous
+  // sensor.getMeasurements(ADC_4096);
+
+  // New way - getting to async.
+  // set to known values to know if they actually ran.
+  sensor._temperature_actual=37;
+  sensor._pressure_actual=37;
+  // first is temperature precision, second is pressure precision
+  sensor.async_getMeasurements(ADC_512,ADC_4096);
+  delay(30); // should be enough time
+
+  Serial.print("Temp actual: ");
+  Serial.println(sensor._temperature_actual);
+  Serial.print("Press actual: ");
+  Serial.println(sensor._pressure_actual);
 
   temperature_c100 = sensor._temperature_actual;
 

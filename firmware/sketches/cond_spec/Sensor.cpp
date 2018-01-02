@@ -31,3 +31,40 @@ void write_base16(Print &out,uint8_t *buff,int count)
     out.write(buff,count);
   }
 }
+
+// State that goes with the function stack
+int fn_stack_i=0; // first unallocated
+SensorClosure fn_stack[FN_STACK_MAX];
+
+void push_fn(Sensor *s, SensorFn fn)
+{
+  if (fn_stack_i>=FN_STACK_MAX) {
+    Serial.println("Sensor stack overflowed");
+    while(1);
+  }
+  fn_stack[fn_stack_i].s=s;
+  fn_stack[fn_stack_i].fn=fn;
+  
+  fn_stack_i++;
+}
+
+void pop_fn() {
+  if( fn_stack_i > 0 ){
+    fn_stack_i--;
+  } else {
+    Serial.println("Pop went too far");
+    while(1);
+  }
+}
+
+void pop_fn_and_call() {
+  if( fn_stack_i > 0 ){
+    fn_stack_i--;
+    // Yuck!!
+    ((fn_stack[fn_stack_i].s)->*(fn_stack[fn_stack_i].fn))();
+  } else {
+    Serial.println("Pop went too far");
+    while(1);
+  }
+  
+}

@@ -22,7 +22,6 @@
 // Test with reduced SPI speed for breadboards.  SD_SCK_MHZ(4) will select 
 // the highest speed supported by the board that is not over 4 MHz.
 // Change SPI_SPEED to SD_SCK_MHZ(50) for best performance.
-#define SPI_SPEED SD_SCK_MHZ(4)
 
 #include <SPI.h>
 #include <SdFat.h>
@@ -421,6 +420,7 @@ void Storage::format(char c) {
   //  'Q' quick format only
 
   //  Soft spi options are configured in SdFat/SdFatConfig.h
+  // RH: is this duplicating Storage::init() call to sd.begin()?
   if (!card.begin(SD_PIN_CS,SPI_SPEED)) {
     Serial.print(
      "\nSD initialization failure!\n"

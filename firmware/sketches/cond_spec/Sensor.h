@@ -27,4 +27,18 @@ extern binary_format_t binary_format;
 
 void write_base16(Print &out,uint8_t *buff,int count);
 
+// wacky function stack for ISRs
+
+// stack of void (*)(void)
+typedef  void (Sensor::*SensorFn)(void);
+typedef struct {
+  SensorFn fn;
+  Sensor *s;
+} SensorClosure; // yeah yeah, it's not a closure.
+
+#define FN_STACK_MAX 20
+void push_fn(Sensor *,SensorFn fn);
+void pop_fn(void); 
+void pop_fn_and_call(void);
+
 #endif // __SENSOR_H__

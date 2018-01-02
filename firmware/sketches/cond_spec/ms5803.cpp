@@ -28,7 +28,8 @@ local pub, and you've found our code helpful, please buy us a round!
 Distributed as-is; no warranty is given.
 ******************************************************************************/
 
-#include <i2c_t3.h> // Wire library is used for I2C
+#include "i2c_t3.h" // Wire library is used for I2C
+#include "Sensor.h"
 #include "ms5803.h"
 
 MS5803::MS5803(ms5803_addr address)
@@ -98,13 +99,19 @@ float MS5803::getPressure(precision _precision)
 }
 
 void MS5803::getMeasurements(precision _precision)
-
 {
   //Retrieve ADC result
-  int32_t temperature_raw = getADCconversion(TEMPERATURE, _precision);
-  int32_t pressure_raw = getADCconversion(PRESSURE, _precision);
+  temperature_raw = getADCconversion(TEMPERATURE, _precision);
+  pressure_raw = getADCconversion(PRESSURE, _precision);
   
-  
+  raw_to_actual();
+}
+
+// Assumes that temperature_raw and pressure_raw have been
+// read in.  Applies calibrations to populate _temperature_actual
+// and _pressure_actual
+void MS5803::raw_to_actual(void)
+{
   //Create Variables for calculations
   int32_t temp_calc;
   int32_t pressure_calc;
@@ -159,7 +166,106 @@ void MS5803::getMeasurements(precision _precision)
   _temperature_actual = temp_calc ;
   _pressure_actual = pressure_calc ; // 10;// pressure_calc;
   
+}
 
+// Starts the chain of functions to ultimately get a new
+// temp/pressure reading
+void MS5803::async_getMeasurements(precision _temp_precision,precision _press_precision)
+{
+  temp_precision=_temp_precision;  // ...
+  press_precision=_press_precision; // these may move...
+
+  // it's a stack, so LIFO
+  push_fn(this,(SensorFn)&MS5803::async_raw_to_actual);
+  push_fn(this,(SensorFn)&MS5803::async_getADC_press);
+  push_fn(this,(SensorFn)&MS5803::async_getADC_temp);
+
+  // set this in motion
+  pop_fn_and_call();
+}
+
+void MS5803::async_getADC_temp(void)
+{
+  push_fn(this,(SensorFn)&MS5803::async_readTemp);
+  push_fn(this,(SensorFn)&MS5803::async_request_three);
+  push_fn(this,(SensorFn)&MS5803::async_sendRead);
+
+  async_conversion(TEMPERATURE+temp_precision);
+}
+
+void MS5803::async_getADC_press(void)
+{
+  push_fn(this,(SensorFn)&MS5803::async_readPress);
+  push_fn(this,(SensorFn)&MS5803::async_request_three);
+  push_fn(this,(SensorFn)&MS5803::async_sendRead);
+
+  async_conversion(PRESSURE+press_precision);
+}
+
+// start the conversion process
+void MS5803::async_conversion(uint8_t flags)
+{
+  // flags is measurement + precision
+  Wire.beginTransmission( _address);
+  Wire.write(CMD_ADC_CONV + flags);
+  Wire.onTransmitDone(pop_fn_and_call);
+  Wire.sendTransmission();
+}
+
+// this gets called once the conversion request has been
+// sent.
+void MS5803::async_sendRead(void)
+{
+  delay(11); // This will have to move, and hopefully become async too.
+  // 11 comes from the worst case conversion time plus a bit of slop.
+  Wire.beginTransmission( _address );
+  Wire.write(CMD_ADC_READ);
+  Wire.onTransmitDone(pop_fn_and_call);
+  Wire.sendTransmission();
+}
+
+void MS5803::async_request_three(void)
+{
+  Wire.onReqFromDone(pop_fn_and_call);
+  Wire.sendRequest(_address, 3);
+}
+
+void MS5803::async_readTemp(void)
+{
+  uint8_t highByte = 0, midByte = 0, lowByte = 0;
+  
+  while(Wire.available()) // RH: not sure why that's a loop..   
+  { 
+    highByte = Wire.read();
+    midByte = Wire.read();
+    lowByte = Wire.read();  
+  }
+  
+  temperature_raw=((uint32_t)highByte << 16) + ((uint32_t)midByte << 8) + lowByte;
+
+  pop_fn_and_call();
+}
+
+
+void MS5803::async_readPress(void)
+{
+  uint8_t highByte = 0, midByte = 0, lowByte = 0;
+  while(Wire.available()) // RH: not sure why that's a loop..   
+  { 
+    highByte = Wire.read();
+    midByte = Wire.read();
+    lowByte = Wire.read();  
+  }
+  
+  pressure_raw=((uint32_t)highByte << 16) + ((uint32_t)midByte << 8) + lowByte;
+
+  pop_fn_and_call();
+}
+
+void MS5803::async_raw_to_actual(void)
+{
+  raw_to_actual();
+  pop_fn_and_call();
 }
 
 uint32_t MS5803::getADCconversion(measurement _measurement, precision _precision)
@@ -171,14 +277,14 @@ uint32_t MS5803::getADCconversion(measurement _measurement, precision _precision
   
   sendCommand(CMD_ADC_CONV + _measurement + _precision);
   // Wait for conversion to complete
-  sensorWait(1); //general delay
   switch( _precision )
-  { 
-    case ADC_256 : sensorWait(1); break; 
-    case ADC_512 : sensorWait(3); break; 
-    case ADC_1024: sensorWait(4); break; 
-    case ADC_2048: sensorWait(6); break; 
-    case ADC_4096: sensorWait(10); break; 
+  {
+    // these include the 1ms "general delay"
+    case ADC_256 : sensorWait(2); break; 
+    case ADC_512 : sensorWait(4); break; 
+    case ADC_1024: sensorWait(5); break; 
+    case ADC_2048: sensorWait(7); break; 
+    case ADC_4096: sensorWait(11); break; 
   } 
   
   sendCommand(CMD_ADC_READ);
