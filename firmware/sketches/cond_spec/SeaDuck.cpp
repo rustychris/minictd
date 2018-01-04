@@ -1,4 +1,4 @@
-#include "i2c_t3.h"
+#include "i2c_t3_local.h"
 
 #include "SeaDuck.h"
 #include "pressure.h"
@@ -108,7 +108,10 @@ void SeaDuck::setup() {
   
   storage.init();
 
+  Serial.println("Storage init");
+  
   for(int i=0;i<num_sensors;i++){
+    Serial.println(i);
     sensors[i]->init();
   }
 }

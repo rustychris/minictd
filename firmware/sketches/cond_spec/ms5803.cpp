@@ -28,15 +28,22 @@ local pub, and you've found our code helpful, please buy us a round!
 Distributed as-is; no warranty is given.
 ******************************************************************************/
 
-#include "i2c_t3.h" // Wire library is used for I2C
+#pragma GCC optimize ("O0")
+
+#include "i2c_t3_local.h" // Wire library is used for I2C
 #include "Sensor.h"
 #include "ms5803.h"
+
+// should it be volatile?
+MS5803 *the_ms5803;
 
 MS5803::MS5803(ms5803_addr address)
 // Base library type I2C
 {
   // Wire.begin(); // this gets called at a more controlled time in SeaDuck::setup()
   _address = address; //set interface used for communication
+
+  the_ms5803=this;  
 }
 
 void MS5803::reset(void)
@@ -168,6 +175,25 @@ void MS5803::raw_to_actual(void)
   
 }
 
+// this gets called once the conversion request has been
+// sent.
+
+void MS5803::async_sendRead() {
+  Wire.beginTransmission( _address );
+  Wire.write(CMD_ADC_READ);
+  Wire.onTransmitDone(pop_fn_and_call); 
+  Wire.sendTransmission();
+}
+
+void MS5803::async_getADC_temp()
+{
+  push_fn(this,(SensorFn)&MS5803::async_readTemp);
+  push_fn(this,(SensorFn)&MS5803::async_request_three);
+  push_fn(this,(SensorFn)&MS5803::async_sendRead);
+
+  async_conversion(TEMPERATURE+temp_precision);
+}
+
 // Starts the chain of functions to ultimately get a new
 // temp/pressure reading
 void MS5803::async_getMeasurements(precision _temp_precision,precision _press_precision)
@@ -177,20 +203,10 @@ void MS5803::async_getMeasurements(precision _temp_precision,precision _press_pr
 
   // it's a stack, so LIFO
   push_fn(this,(SensorFn)&MS5803::async_raw_to_actual);
-  push_fn(this,(SensorFn)&MS5803::async_getADC_press);
   push_fn(this,(SensorFn)&MS5803::async_getADC_temp);
-
+  push_fn(this,(SensorFn)&MS5803::async_getADC_press);
   // set this in motion
   pop_fn_and_call();
-}
-
-void MS5803::async_getADC_temp(void)
-{
-  push_fn(this,(SensorFn)&MS5803::async_readTemp);
-  push_fn(this,(SensorFn)&MS5803::async_request_three);
-  push_fn(this,(SensorFn)&MS5803::async_sendRead);
-
-  async_conversion(TEMPERATURE+temp_precision);
 }
 
 void MS5803::async_getADC_press(void)
@@ -202,25 +218,28 @@ void MS5803::async_getADC_press(void)
   async_conversion(PRESSURE+press_precision);
 }
 
+void end_delay_and_pop() {
+  sensorTimer.end();
+  
+  pop_fn_and_call(); 
+}
+
 // start the conversion process
 void MS5803::async_conversion(uint8_t flags)
 {
   // flags is measurement + precision
   Wire.beginTransmission( _address);
   Wire.write(CMD_ADC_CONV + flags);
-  Wire.onTransmitDone(pop_fn_and_call);
-  Wire.sendTransmission();
-}
 
-// this gets called once the conversion request has been
-// sent.
-void MS5803::async_sendRead(void)
-{
-  delay(11); // This will have to move, and hopefully become async too.
-  // 11 comes from the worst case conversion time plus a bit of slop.
-  Wire.beginTransmission( _address );
-  Wire.write(CMD_ADC_READ);
-  Wire.onTransmitDone(pop_fn_and_call);
+  // HERE - technically we should wait until the transmit completes,
+  // and then wait for 11ms.  But it's the 11ms that really holds things
+  // up, so this should be a timed interrupt call instead of async i2c.
+  // Wire.onTransmitDone(pop_fn_and_call);
+  if ( ! sensorTimer.begin(end_delay_and_pop,13000) ) {
+    Serial.println("No timers available!");
+  }
+  // make sure that we do not trigger an ISR on transmit done
+  Wire.onTransmitDone(NULL);
   Wire.sendTransmission();
 }
 
@@ -233,7 +252,7 @@ void MS5803::async_request_three(void)
 void MS5803::async_readTemp(void)
 {
   uint8_t highByte = 0, midByte = 0, lowByte = 0;
-  
+
   while(Wire.available()) // RH: not sure why that's a loop..   
   { 
     highByte = Wire.read();
@@ -251,7 +270,7 @@ void MS5803::async_readPress(void)
 {
   uint8_t highByte = 0, midByte = 0, lowByte = 0;
   while(Wire.available()) // RH: not sure why that's a loop..   
-  { 
+  {
     highByte = Wire.read();
     midByte = Wire.read();
     lowByte = Wire.read();  
@@ -264,7 +283,11 @@ void MS5803::async_readPress(void)
 
 void MS5803::async_raw_to_actual(void)
 {
+  Wire.onTransmitDone(NULL);
+  Wire.onReqFromDone(NULL);
+  
   raw_to_actual();
+
   pop_fn_and_call();
 }
 
@@ -274,7 +297,7 @@ uint32_t MS5803::getADCconversion(measurement _measurement, precision _precision
 { 
   uint32_t result;
   uint8_t highByte = 0, midByte = 0, lowByte = 0;
-  
+
   sendCommand(CMD_ADC_CONV + _measurement + _precision);
   // Wait for conversion to complete
   switch( _precision )

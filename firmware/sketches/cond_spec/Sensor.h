@@ -6,6 +6,8 @@
 
 #include <SdFat.h>
 
+extern IntervalTimer sensorTimer;
+
 class Sensor {
 public:
   Sensor() {
@@ -31,6 +33,8 @@ void write_base16(Print &out,uint8_t *buff,int count);
 
 // stack of void (*)(void)
 typedef  void (Sensor::*SensorFn)(void);
+// typedef void (*SensorFn)(Sensor*);
+
 typedef struct {
   SensorFn fn;
   Sensor *s;

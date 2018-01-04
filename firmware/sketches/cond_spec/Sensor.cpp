@@ -1,5 +1,10 @@
 #include "Sensor.h"
 
+
+#pragma GCC optimize ("O0")
+
+IntervalTimer sensorTimer;
+
 binary_format_t binary_format;
 
 uint8_t hexmap[]={'0','1','2','3','4','5','6','7',
@@ -33,8 +38,8 @@ void write_base16(Print &out,uint8_t *buff,int count)
 }
 
 // State that goes with the function stack
-int fn_stack_i=0; // first unallocated
-SensorClosure fn_stack[FN_STACK_MAX];
+volatile int fn_stack_i=0; // first unallocated
+volatile SensorClosure fn_stack[FN_STACK_MAX];
 
 void push_fn(Sensor *s, SensorFn fn)
 {
@@ -49,22 +54,21 @@ void push_fn(Sensor *s, SensorFn fn)
 }
 
 void pop_fn() {
+  // This is mostly for debugging, so leave it verbose
+  Serial.println("Pop no call");
   if( fn_stack_i > 0 ){
     fn_stack_i--;
   } else {
-    Serial.println("Pop went too far");
-    while(1);
+    Serial.println("Stack empty");
   }
 }
 
 void pop_fn_and_call() {
   if( fn_stack_i > 0 ){
     fn_stack_i--;
+
     // Yuck!!
     ((fn_stack[fn_stack_i].s)->*(fn_stack[fn_stack_i].fn))();
-  } else {
-    Serial.println("Pop went too far");
-    while(1);
   }
-  
 }
+

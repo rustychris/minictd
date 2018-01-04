@@ -102,18 +102,19 @@ public:
   void async_raw_to_actual(void);
   
   void raw_to_actual(void);
-  
-private:
-  
-  ms5803_addr _address;     // Variable used to store I2C device address.
-  uint16_t coefficient[8];// Coefficients;
 
   precision temp_precision;
   precision press_precision;
 
   // the most recent measurements
-  int32_t temperature_raw;
-  int32_t pressure_raw;
+  // volatile may not be necessary - trying while debugging pressure=0 problem.
+  volatile int32_t temperature_raw;
+  volatile int32_t pressure_raw;
+  
+private:
+  
+  ms5803_addr _address;     // Variable used to store I2C device address.
+  uint16_t coefficient[8];// Coefficients;
   
   void sendCommand(uint8_t command);  // General I2C send command function
   uint32_t getADCconversion(measurement _measurement, precision _precision);  // Retrieve ADC result

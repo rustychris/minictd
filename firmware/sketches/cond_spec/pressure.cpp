@@ -17,21 +17,26 @@ void Pressure::init(){
 
 void Pressure::read() {
   // Old way - works, but synchronous
-  // sensor.getMeasurements(ADC_4096);
+  if( 0 ) {
+    sensor.getMeasurements(ADC_4096);
 
-  // New way - getting to async.
-  // set to known values to know if they actually ran.
-  sensor._temperature_actual=37;
-  sensor._pressure_actual=37;
-  // first is temperature precision, second is pressure precision
-  sensor.async_getMeasurements(ADC_512,ADC_4096);
-  delay(30); // should be enough time
+    Serial.print("Temp raw: ");
+    Serial.println(sensor.temperature_raw);
+    Serial.print("Press raw: ");
+    Serial.println(sensor.pressure_raw);
+  }
 
-  Serial.print("Temp actual: ");
-  Serial.println(sensor._temperature_actual);
-  Serial.print("Press actual: ");
-  Serial.println(sensor._pressure_actual);
-
+  if( 1 ) {
+    // New way - getting to async.
+    // set to known values to know if they actually ran.
+    sensor.temperature_raw=37;
+    sensor.pressure_raw=37;
+    // first is temperature precision, second is pressure precision
+    sensor.async_getMeasurements(ADC_4096,ADC_4096);
+    
+    delay(40); // should be enough time?
+  }
+  
   temperature_c100 = sensor._temperature_actual;
 
   // 1 bar ~ 100kPa
@@ -42,7 +47,7 @@ void Pressure::read() {
 void Pressure::display(){
   read();
   
-  Serial.print("temp_ms5803==");
+  Serial.print("temp_ms5803=");
   Serial.println(temperature_c100 / 100.0f);
   
   Serial.print("press_abs_mbar=");
