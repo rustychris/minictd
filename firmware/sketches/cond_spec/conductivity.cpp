@@ -163,7 +163,8 @@ void adc0_dma_isr(void)
   adc0_dma.clearInterrupt();
 
   // maxed out - no more space to accumulate
-  if (adc0_n >= adc_n ) return;
+  if (adc0_n >= adc_n )
+    return;
   
   // Following audio library:
   // buff_n_samples/2 used to be ( sizeof(adc0_buffer) / dac_out_stride / 2 )
@@ -191,7 +192,10 @@ void adc0_dma_isr(void)
     int16_t sample=(int16_t)adc0_buffer[j];
     adc0_accum[j] += sample;
     adc0_variance[j] += (sample*sample)>>adc_var_shift;
-  } 
+  }
+
+  if ( adc0_n==adc_n )
+    pop_fn_and_call();
 }
 
 void adc1_dma_isr(void)
@@ -230,7 +234,9 @@ void adc1_dma_isr(void)
     int16_t sample=(int16_t)adc1_buffer[j];
     adc1_accum[j] += sample;
     adc1_variance[j] += (sample*sample)>>adc_var_shift;
-  } 
+  }
+  if ( adc1_n==adc_n )
+    pop_fn_and_call();
 }
 
 void Conductivity::adc_setup(void) {
@@ -435,8 +441,10 @@ void Conductivity::dac_setup(void) {
   // Trigger it twice by hand to load the first 16 samples
   dac_dma.triggerManual();
   // it only needs to copy 4 4byte samples, ought to take less than
-  // a microsecond.  
-  delay(1); 
+  // a microsecond.
+  // used to have a delay(1) here, but as this will get called in ISR's, have
+  // to use delayMicroseconds (which is a better fit anyway)
+  delayMicroseconds(50); 
   dac_dma.triggerManual();
 
 }
@@ -548,8 +556,6 @@ void Conductivity::scan_setup() {
   adc_setup();
   dac_setup();
   pdb_setup();  
-
-  // Serial.println("# Setup complete");
 }
 
 void Conductivity::scan_cleanup() {
@@ -622,14 +628,35 @@ void Conductivity::scan() {
 //   Generic interface for SeaDuck, setup-to-cleanup scan,
 //   reducing the values to a conductivity value.
 void Conductivity::read() {
-  scan_setup(); // 1ms
+  // Sync code:
+  if ( 0 ) {
+    scan_setup(); // 1ms
+    wait_for_scan(); // 100 ms
+    scan_reduce();
+    scan_cleanup(); // 0 ms
+  }
 
-  wait_for_scan(); // 100 ms
+  // dev for async code
+  if ( 1 ) {
+    // there are two semi-independent events for continuing:
+    // ADC0 stops recording and ADC1 stops recording.
+    // Whoever finishes first will pop the nop, and the
+    // second will finish the process
+    push_fn(this,(SensorFn)&Conductivity::async_scan_post);
+    push_fn(NULL,NULL);
 
-  scan_reduce();
-  
-  scan_cleanup(); // 0 ms
+    scan_setup(); // all immediate
+
+    delay(200); // very liberal for the time being
+  }
 }
+
+void Conductivity::async_scan_post() {
+  scan_reduce();
+  scan_cleanup();
+  pop_fn_and_call();
+}
+
 
 void Conductivity::scan_reduce() {
   // HERE
@@ -848,11 +875,3 @@ int Conductivity::real_freq_hz() {
   // ordering here:
   return ((PDB_F0/BLOCKSIZE) * dac_per_adc*dac_out_stride)/pdb_period;
 }
-  
-
-/// HERE:
-// See if the above produces some binary crap in the
-// serial monitor.  May have to shift to python to see the
-// binary then.  yep.
-// check numbits() maybe to see if data is discarded? ?
-// data need a python ui to read this stuff in.

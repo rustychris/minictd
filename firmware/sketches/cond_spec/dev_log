@@ -223,46 +223,7 @@ This leaves two options:
  and objects
 
 
-1. Is there a way to get an interrupt instead of a delay in the ms5803 code?
-   Currently it computes a delay of some milliseconds.  up to 9ms.
 
-2. Break up the ms5803 code to make separate calls for each
-   synchronous block of code
-
-  - compiles, ready to test and debug
-
-  Hmm - the first step that gets called from an ISR:
-    if the function that gets called is just a hello world, it executes no problem.
-    if the ISR calls pop_fn_and_call(), or hello_world calls that, then system hangs,
-      trapping some output at the same time.
-    if the main thread calls pop_fn_and_call() directly, it runs okay.
-
-  some of this could be from the pressure sensor getting into a bad state, fixable by
-  removing power
-
-  - it hangs a lot when trying to use the timer interrupt code.
-    this happens even if the function stack is not involved at all, and I use
-    a global pointer to the MS5803 object.
-    - it seems that calling Wire code from within the ISR is causing issues
-    is there an issue that somebody isn't re-enabling interrupts?
-
-    so it can get back to the delay(30); call in pressure.cpp before the Timer ISR
-    is called.  once it's called, we never return.
-
-updated to newest (2018-01-03) i2c_t3, and disabled the priority checks
- FIXED IT?  yes.
-
-
- temp reading looks okay, but pressure?  synchronous I get 25557, async -54168, but
- the same temp reading.
- pressure_raw is 0 in the async code, and 5168946 in the sync code
-
-sync code: flags are 24,8, corresponding to temp and pressure
-async code: flags are 18 and 8? pressure is 0, temp is 16.
-  4096 is 8.
- fixed it so flags are identical, no change in output.
- declare raw values volatile?  no change.
-
- flipping the order in async_getMeasurements makes temp=0.
- 
-3. Queue those calls and work through the casting bits
+Next up is getting conductivity to work async.  Pursue a similar
+approach, not linking everything up just yet, but get a direct
+call to conductivity to work async

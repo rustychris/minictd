@@ -64,11 +64,16 @@ void pop_fn() {
 }
 
 void pop_fn_and_call() {
+  // May need to rethink some of this, possibly protect this from
+  // reentrance or competing calls to push_fn().
   if( fn_stack_i > 0 ){
     fn_stack_i--;
-
-    // Yuck!!
-    ((fn_stack[fn_stack_i].s)->*(fn_stack[fn_stack_i].fn))();
+    // it's allowable to pass NULL in for the object, which is
+    // essentially a NOP, and a cheap pseudo-semaphore
+    if( fn_stack[fn_stack_i].s != NULL ) {
+      // Yuck!!
+      ((fn_stack[fn_stack_i].s)->*(fn_stack[fn_stack_i].fn))();
+    }
   }
 }
 

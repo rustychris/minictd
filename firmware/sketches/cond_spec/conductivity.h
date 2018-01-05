@@ -45,6 +45,9 @@ public:
   virtual void write_data(Print &out);
   
   float reading; // would it be better for this to be a scaled int?
+
+  // async support
+  void async_scan_post(); 
 };
 
 #endif // CONDUCTIVITY_H
