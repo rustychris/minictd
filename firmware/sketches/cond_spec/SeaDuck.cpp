@@ -140,6 +140,7 @@ void SeaDuck::dispatch_command() {
 void SeaDuck::help() {
   Shell::help();
   Serial.println("    sample # one-shot sampling");
+  Serial.println("    sample_loop # continuous sampling");
   Serial.println("    interval_us[=NNNN] # sampling interval in usecs");
   for(int i=0;i<num_sensors;i++ ) {
     sensors[i]->help();

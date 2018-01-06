@@ -27,6 +27,8 @@ void Pressure::read() {
   }
 
   if( 1 ) {
+    push_busy();
+    
     // New way - getting to async.
     // set to known values to know if they actually ran.
     sensor.temperature_raw=37;
@@ -34,7 +36,8 @@ void Pressure::read() {
     // first is temperature precision, second is pressure precision
     sensor.async_getMeasurements(ADC_4096,ADC_4096);
     
-    delay(40); // should be enough time?
+    while(busy);
+    //delay(40); // should be enough time?
   }
   
   temperature_c100 = sensor._temperature_actual;

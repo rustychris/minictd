@@ -5,6 +5,23 @@
 
 IntervalTimer sensorTimer;
 
+void Sensor::clear_busy(void) {
+  busy--;
+    
+  if(busy<0) {
+    Serial.println("Busy went negative");
+    // while(1);
+  }
+}
+
+void Sensor::push_busy(void) {
+  if (busy>0) {
+    Serial.println("FAIL busy is already nonzero");
+  }
+  busy++;
+  push_fn(this,(SensorFn)&Sensor::clear_busy);
+}
+
 binary_format_t binary_format;
 
 uint8_t hexmap[]={'0','1','2','3','4','5','6','7',

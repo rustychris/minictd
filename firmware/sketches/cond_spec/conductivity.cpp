@@ -642,12 +642,15 @@ void Conductivity::read() {
     // ADC0 stops recording and ADC1 stops recording.
     // Whoever finishes first will pop the nop, and the
     // second will finish the process
+    push_busy();
+    
     push_fn(this,(SensorFn)&Conductivity::async_scan_post);
     push_fn(NULL,NULL);
 
     scan_setup(); // all immediate
 
-    delay(200); // very liberal for the time being
+    while(busy);
+    //delay(200); // very liberal for the time being
   }
 }
 

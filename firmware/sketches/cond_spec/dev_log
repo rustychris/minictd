@@ -222,8 +222,22 @@ This leaves two options:
  But rather than hard-coding the order, let's have a stack of functions
  and objects
 
-
-
 Next up is getting conductivity to work async.  Pursue a similar
 approach, not linking everything up just yet, but get a direct
 call to conductivity to work async
+
+Seems to work.  Loop time is 247ms -- fine.
+  - pressure has a 40ms delay right now, and ADC has a 200ms delay.
+
+So far just setting the various read() functions to use the
+async approach.  But better to have an async_read(), which does
+the same thing as read() but rather than any delays, it
+makes sure the next callback gets scheduled afterwards. Probably
+best to have read() use async_read(), with a an extra action at
+the end so it returns when done (i.e. a semaphore of some sort)
+
+async temperature is working.
+the busy mechanism is not robust - no guard against using it
+when busy is already nonzero.  Well, added a simple print statement.
+
+Loop time down to 50ms, not sure how much of that is output.

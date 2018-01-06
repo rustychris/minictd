@@ -14,6 +14,9 @@ public:
   virtual void write_data(Print &out);
   
   float reading;
+  
+private:
+  void async_read_result(void);
 };
 
 #endif // THERMISTOR_H

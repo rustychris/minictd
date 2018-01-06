@@ -21,6 +21,10 @@ public:
   virtual void write_frame_info(Print &out){};
   virtual void write_data(Print &out){};
 
+  volatile int busy;
+  void clear_busy(void);
+  void push_busy(void);
+  
   bool enabled;
 };
 
