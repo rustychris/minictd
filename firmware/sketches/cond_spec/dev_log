@@ -249,5 +249,34 @@ Packaging the async's together:
 
 That's working.
 
-HERE: need an asynchronous sampling loop, such that the main thread of
-control can tend to the SD card and check for abort on input.
+Sampling loop is now asynchronous.
+
+Basic logging to SD is now in place. Storage.cpp could probably be simplified,
+since we don't need to track two types of blocks anymore.
+
+Had to tamp interval down to 0.1s, as it was too close to the bleeding edge
+when running at 0.05s.
+
+Temperature slope is too strong.  Seems like they agreed okay around
+23 deg.
+
+Now ms5803 reads 19.3, thermapen 19.4 (!), and thermistor 12.93.
+
+Adjusted to get a bit closer.
+
+Pressure now computes the delay, and with ADC_1024 we can get 35ms
+loops, but not 30ms, so 28Hz.  That's 2 * 5ms delays.
+With a more drastic settings on conductivity, that can be 25ms for
+40Hz.
+
+NEXT:
+ - Read commands from SD card.
+   At that point, the code is MVP.  Return to battery operation - is it possible
+   to read over USB and run from battery at the same time?  May have to fab new
+   board to get at trace to cut it.
+
+   
+ 
+
+
+

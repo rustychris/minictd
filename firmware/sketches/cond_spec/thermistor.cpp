@@ -70,7 +70,9 @@ void Thermistor::async_read_result(void)
   R= NTC_R_REF*(1/dratio -1);
   
   //fiction!
-  reading=23.0 - (R-108000)*0.0005;
+  // reading=23.0 - (R-108000)*0.0005;
+  // slightly refined but still not true calibration
+  reading=23.0 - (R-108000)*0.00017;
 
   pop_fn_and_call();
 }

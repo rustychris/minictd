@@ -21,7 +21,8 @@ void Pressure::async_read() {
   sensor.temperature_raw=37;
   sensor.pressure_raw=37;
   // first is temperature precision, second is pressure precision
-  sensor.async_getMeasurements(ADC_4096,ADC_4096);
+  // sensor.async_getMeasurements(ADC_4096,ADC_4096);
+  sensor.async_getMeasurements(ADC_1024,ADC_1024);
 }
 
 void Pressure::display(){

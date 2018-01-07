@@ -16,20 +16,13 @@ SdFile myFile;// for logging
 
 // tradeoff of latency tolerance versus RAM usage.
 // at 10kHz logging, 12 got some overruns.
+// What is the difference between BUFFER_BLOCK_COUNT
+// and QUEUE_DIM?  This code has an extra level of
+// indirection that we probably don't need.
 const uint8_t BUFFER_BLOCK_COUNT = 30; 
-const uint16_t DATA_DIM = 504;  
-
-#define FLAG_TYPE_MASK 1
-#define FLAG_TYPE_DATA 0
-#define FLAG_TYPE_TEXT 1
-#define FLAG_OVERRUN 2
+const uint16_t DATA_DIM = 512;  
 
 struct block_t {
-  uint32_t unixtime; 
-  uint16_t ticks;
-  uint8_t frame_count;
-  uint8_t flags;
-
   uint8_t data[DATA_DIM];
 };
 
@@ -49,7 +42,6 @@ block_t* fullQueue[QUEUE_DIM];
 uint8_t fullHead;
 uint8_t fullTail;
 
-
 // allocate buffer space
 // note that this is always used, regardless of whether we're sampling or 
 // not.  If more functions are added which want some RAM when not 
@@ -65,32 +57,23 @@ void Storage::init(void) {
   if (!sd.begin(SD_PIN_CS, SPI_SPEED)) {
     // rather than halt, go into a loop repeating the message 
     // to make it easier to catch on a serial console
-    // beep_code(Logger::NO_SD_CARD);
     for(int i=0;i<20;i++) {
       sd.initErrorPrint();
       delay(500);
     }
     status=NOCARD;
   } else {
-    status=ENABLED;
+    status=DISABLED;
   }
-}
 
-// This is called before sampling begins, setting up the buffers
-// and in the future possibly pre-allocating files.
-void Storage::setup(void) {
-  // initialize queues
+  // And initialize the block queues
   emptyHead = emptyTail = 0;
   fullHead = fullTail = 0;
   
   // initialize ISR
-  isrBuf = 0;
+  isrBuf = 0; 
   isrOver = 0;
-
-  // possible to use the SdFat buffer for a block, 
-  // but try keeping the logic here independent of that level
-  // of internals, and just pay the price of some copying
-  
+    
   // put rest of buffers in empty queue
   // relies on fullQueue and emptyQueue being initialized to 0
   // by the compiler.
@@ -98,12 +81,7 @@ void Storage::setup(void) {
     emptyQueue[emptyHead] = (block_t*)(block + 512 * i);
     emptyHead = queueNext(emptyHead);
   }
-
-  if( ! log_to_serial ) {
-    if (status==ENABLED)
-      open_next_file();
-  }
-
+    
   overruns = 0;
   frame_count = 0;
 }
@@ -118,7 +96,13 @@ void Storage::open_next_file(void) {
                    // dt.year(),dt.month(),dt.day(),dt.hour(),dt.minute(),dt.second());
                    year(unixtime), month(unixtime), day(unixtime),hour(unixtime),
                    minute(unixtime),second(unixtime));
-  sync_counter=0;
+  status=ENABLED;
+  sync_counter=0; // counter for periodically flushing data
+}
+
+void Storage::close_file(void) {
+  status=DISABLED;
+  myFile.close();
 }
 
 /* 
@@ -126,10 +110,7 @@ void Storage::open_next_file(void) {
   exist, starting at data0000.bin
  */
 void Storage::set_next_active_filename(void) {
-  if(status==DISABLED) {
-    strcpy(active_filename,"--DISABLED--");
-    return;
-  } else if(status==NOCARD) {
+  if(status==NOCARD) {
     strcpy(active_filename,"---NOCARD---");
     return;
   }
@@ -142,7 +123,7 @@ void Storage::set_next_active_filename(void) {
       for(active_filename[6]='0';active_filename[6]<='9';active_filename[6]++) {
         for(active_filename[7]='0';active_filename[7]<='9';active_filename[7]++) {
           if( ! sd.exists(active_filename) ) {
-            Serial.print("Logging to ");
+            Serial.print("# Logging to ");
             Serial.println(active_filename);
             return;
           }
@@ -152,53 +133,31 @@ void Storage::set_next_active_filename(void) {
   }
 }
 
-
-//--- BELOW HERE things need to be switched to async
-
 // this is called periodically to flush full buffers to SD
 void Storage::loop(void) {
   // Loop a finite number of times - 
   // if we're swamped, better to occasionally come up for air
   // and see if there is input waiting to stop the process
   for( uint16_t write_loops=0; 
-       (fullHead != fullTail) && write_loops <  BUFFER_BLOCK_COUNT;
+       (fullHead != fullTail) && write_loops < BUFFER_BLOCK_COUNT;
        write_loops++ ) {
     // block to write
     block_t* block = fullQueue[fullTail];
-    sync_counter++;
+    sync_counter++; // one step closer to needing to sync()
 
-    if( log_to_serial ) {
-      for(int fidx=0;fidx<block->frame_count;fidx++) {
-        Serial.print(STREAM_START_LINE);
-        for(int i=0;i<frame_bytes;i++){
-          uint8_t byte=block->data[fidx*frame_bytes+i];
-          // unfortunately, Serial drops leading 0, so manually pad each byte to 2 hex digits.
-          if( byte<0x10 ) 
-            Serial.print("0");
-          Serial.print(byte,HEX);
-        }
-        Serial.println();
-      }
-    } else {
-      if ( status==ENABLED ) {
-        if (!myFile.write((void*)block,sizeof(block_t))) {
-          sd.errorHalt("failed to write");
-        }
+    if ( status==ENABLED ) {
+      if (!myFile.write((void*)block,sizeof(block_t))) {
+        sd.errorHalt("failed to write");
       }
     }
-    frame_count += block->frame_count;
-    // check for overrun - doesn't count them, just flags
-    // that there were some.
-    if (block->flags & FLAG_OVERRUN) {
-      overruns += 1;
-    }
+    
     // move block to empty queue
     emptyQueue[emptyHead] = block;
     emptyHead = queueNext(emptyHead);
     fullTail = queueNext(fullTail);
 
     if ( status==ENABLED ) {
-      if ( !log_to_serial && (sync_counter > sync_interval_blocks) ) {
+      if ( sync_counter > sync_interval_blocks ) {
         myFile.sync();
         sync_counter=0;
       }
@@ -215,59 +174,52 @@ void Storage::cleanup(void) {
   }
   loop(); // write any straggling data
   if ( status==ENABLED ) {
-    if ( !log_to_serial )
-      myFile.close();
+    close_file();
   }
 }
 
-
-/** call this when a sample has been converted - will queue it in the
-    right buffer.  safe for calling inside ISR */
-void Storage::store_frame(uint8_t *frame) {
-  // experiment to get low-latency serial output
-  // if there is no backlog of blocks to be written, then
-  // go ahead and flush this block so it can be written
-  // sooner
-  if ( isrBuf && log_to_serial && (fullHead == fullTail) ) {
-    close_block();
-  }
-  // Get an appropriate block
-
-  // switch to a data block if necessary
-  if( isrBuf && ( (isrBuf->flags&FLAG_TYPE_MASK) == FLAG_TYPE_TEXT) ) {
-    close_block();
-  }
-  if ( !isrBuf ) {
-    open_block(FLAG_TYPE_DATA);
-    if(!isrBuf) return;
-  }
-
-  memcpy(&(isrBuf->data[isrBuf_pos]),
-         frame,
-         frame_bytes);
-  isrBuf_pos+=frame_bytes;
-  isrBuf->frame_count++;
-
-  // if no room for another frame, mark this one full
-  if (DATA_DIM < isrBuf_pos+frame_bytes ) {
-    close_block();
-  }
-}
+// /** call this when a sample has been converted - will queue it in the
+//     right buffer.  safe for calling inside ISR */
+// void Storage::store_frame(uint8_t *frame) {
+//   // experiment to get low-latency serial output
+//   // if there is no backlog of blocks to be written, then
+//   // go ahead and flush this block so it can be written
+//   // sooner
+//   // if ( isrBuf && log_to_serial && (fullHead == fullTail) ) {
+//   //   close_block();
+//   // }
+//   
+//   // Get an appropriate block
+// 
+//   // // switch to a data block if necessary
+//   // if( isrBuf && ( (isrBuf->flags&FLAG_TYPE_MASK) == FLAG_TYPE_TEXT) ) {
+//   //   close_block();
+//   // }
+//   
+//   if ( !isrBuf ) {
+//     open_block();
+//     if(!isrBuf) return;
+//   }
+// 
+//   memcpy(&(isrBuf->data[isrBuf_pos]),
+//          frame,
+//          frame_bytes);
+//   isrBuf_pos+=frame_bytes;
+//   // isrBuf->frame_count++;
+// 
+//   // if no room for another frame, mark this one full
+//   if (DATA_DIM < isrBuf_pos+frame_bytes ) {
+//     close_block();
+//   }
+// }
 
 // only call when isrBuf==0 !
-void Storage::open_block(uint8_t flags) {
+void Storage::open_block() {
   if (emptyHead != emptyTail) {
     // remove buffer from empty queue
     isrBuf = emptyQueue[emptyTail];
     emptyTail = queueNext(emptyTail);
-    // initialize block:
-    isrBuf->frame_count = 0; // no frames
-    isrBuf->unixtime=logger.unixtime(); // logger.unixtime;
     isrBuf_pos=0;
-#ifdef RTC_ENABLE
-    isrBuf->ticks=logger.rtc_pulse_count;
-#endif
-    isrBuf->flags=flags;
   } else {
     // no buffers - count overrun
     if (isrOver < 0XFF) isrOver++;
@@ -291,62 +243,14 @@ void Storage::close_block(void){
 }
 
 size_t Storage::write(uint8_t b) {
-  // switch to a text block if necessary
-  if( isrBuf &&
-      ( (isrBuf->flags&FLAG_TYPE_MASK) == FLAG_TYPE_DATA) ) {
-    close_block();
-  }
-
   if ( !isrBuf ) 
-    open_block(FLAG_TYPE_TEXT);
+    open_block();
   if ( !isrBuf ) return 0;
 
   isrBuf->data[isrBuf_pos++] = b;
-  // last byte should be left 0 as null termination for the
-  // string
-  if( isrBuf_pos>=DATA_DIM-1 ) {
-    isrBuf_pos=DATA_DIM-1; // just in case isrBuf_pos got crazy
+  if( isrBuf_pos>=DATA_DIM ) // really should never be greater
     close_block();
-  }
   return 1;
-}
-
-uint8_t Storage::send_data(const char *filename,uint32_t start,uint32_t bytes) {
-  // send a portion of a file over the serial link
-  // the data are hex-encoded, and
-  // after the data, an additional 8-bit checksum is sent, also hex-encoded.
-  
-
-  // returns 0 on success
-  uint8_t checksum=0;
-  
-  if (!myFile.open(filename, O_READ )) {
-    Serial.print("Failed to open ");
-    Serial.println(filename);
-    return 1;
-  }
-  myFile.seekSet(start);
-
-  if ( bytes==0 ) {
-    bytes=myFile.fileSize();
-  }
-
-  uint8_t c;
-
-  for(uint32_t i=0;i<bytes;i++) {
-    myFile.read(&c,1);
-    if( c<0xF ) Serial.write('0');
-    Serial.print(c,HEX);
-    if((i>0) && ((i & 0x3F) == 0x3F) ) 
-      Serial.println("");
-    checksum+=c;
-  }
-  Serial.println("");
-  if( checksum<0xF ) Serial.write('0');
-  Serial.println(checksum,HEX);
-  
-  myFile.close();
-  return 0;
 }
 
 void Storage::info() 
@@ -361,17 +265,20 @@ void Storage::info()
   } else if (status==ENABLED) {
     Serial.println("ENABLED");
   }
-  Serial.print("log_to_serial: ");
-  Serial.println(log_to_serial);
+  // Serial.print("log_to_serial: ");
+  // Serial.println(log_to_serial);
 }
 
 bool confirm(void) {
-  while(!Serial.available()) ;
-
+  // be extra careful that we don't accidentally format
+  // discard any extraneous characters:
+  while(Serial.available()) Serial.read();
+  
   Serial.println("Are you sure you want to proceed? Type y to confirm");
 
+  while(!Serial.available()) ; // wait for a key press
   char key = Serial.read(); 
-  
+
   return key == 'y';
 }
 
@@ -396,6 +303,12 @@ bool Storage::dispatch_command(const char *cmd, const char *cmd_arg) {
     sd.ls(&Serial,LS_SIZE);
   } else if ( strcmp(cmd,"sd_status")==0) {
     info();
+  } else if ( strcmp(cmd,"sd_open")==0) {
+    open_next_file();
+    Serial.print("# opened ");
+    Serial.println(active_filename);
+  } else if ( strcmp(cmd,"sd_close")==0) {
+    close_file();
   } else {
     return false;
   }
@@ -409,4 +322,6 @@ void Storage::help() {
   Serial.println("    quickformat # as advertised");
   Serial.println("    ls          # show files on sd card");
   Serial.println("    sd_status   # display SD info");
+  Serial.println("    sd_open     # open next file for output");
+  Serial.println("    sd_close    # close current output file");
 }

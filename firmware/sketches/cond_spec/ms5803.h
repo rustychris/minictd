@@ -49,6 +49,7 @@ enum measurement
   PRESSURE = 0x00,
   TEMPERATURE = 0x10
 };
+#define MEASUREMENT_MASK 0x10
 
 // Define constants for Conversion precision
 enum precision
@@ -57,8 +58,11 @@ enum precision
   ADC_512  = 0x02,
   ADC_1024 = 0x04,
   ADC_2048 = 0x06,
-  ADC_4096 = 0x08
+  ADC_4096 = 0x08,
+  ADC_MASK = 0x0E
 };
+
+uint32_t millis_for_flags(uint8_t);
 
 // Define address choices for the device (I2C mode)
 enum ms5803_addr

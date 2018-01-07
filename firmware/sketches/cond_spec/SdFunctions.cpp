@@ -411,7 +411,7 @@ void formatCard() {
 // setup() removed since we're using this as a library
 
 void Storage::format(char c) {
-  if (status!=ENABLED)
+  if (status==NOCARD)
     return;
 
   // options for c
@@ -419,7 +419,7 @@ void Storage::format(char c) {
   //  'F' erase and format
   //  'Q' quick format only
 
-  //  Soft spi options are configured in SdFat/SdFatConfig.h
+  // Soft spi options are configured in SdFat/SdFatConfig.h
   // RH: is this duplicating Storage::init() call to sd.begin()?
   if (!card.begin(SD_PIN_CS,SPI_SPEED)) {
     Serial.print(

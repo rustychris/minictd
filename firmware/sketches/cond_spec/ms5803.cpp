@@ -235,7 +235,9 @@ void MS5803::async_conversion(uint8_t flags)
   // and then wait for 11ms.  But it's the 11ms that really holds things
   // up, so this should be a timed interrupt call instead of async i2c.
   // Wire.onTransmitDone(pop_fn_and_call);
-  if ( ! sensorTimer.begin(end_delay_and_pop,13000) ) {
+  uint32_t delay_ms=millis_for_flags(flags);
+    
+  if ( ! sensorTimer.begin(end_delay_and_pop,1000*delay_ms) ) {
     Serial.println("No timers available!");
   }
   // make sure that we do not trigger an ISR on transmit done
@@ -291,6 +293,19 @@ void MS5803::async_raw_to_actual(void)
   pop_fn_and_call();
 }
 
+uint32_t millis_for_flags(uint8_t flags) {
+  switch( flags & ADC_MASK )
+    {
+      // these include the 1ms "general delay"
+    case ADC_256 : return 2;
+    case ADC_512 : return 4; 
+    case ADC_1024: return 5; 
+    case ADC_2048: return 7; 
+    case ADC_4096: return 11;
+    }
+  return 11; // shouldn't happen
+}
+
 uint32_t MS5803::getADCconversion(measurement _measurement, precision _precision)
 // Retrieve ADC measurement from the device.  
 // Select measurement type and precision
@@ -298,17 +313,9 @@ uint32_t MS5803::getADCconversion(measurement _measurement, precision _precision
   uint32_t result;
   uint8_t highByte = 0, midByte = 0, lowByte = 0;
 
-  sendCommand(CMD_ADC_CONV + _measurement + _precision);
-  // Wait for conversion to complete
-  switch( _precision )
-  {
-    // these include the 1ms "general delay"
-    case ADC_256 : sensorWait(2); break; 
-    case ADC_512 : sensorWait(4); break; 
-    case ADC_1024: sensorWait(5); break; 
-    case ADC_2048: sensorWait(7); break; 
-    case ADC_4096: sensorWait(11); break; 
-  } 
+  uint8_t flags=CMD_ADC_CONV + _measurement + _precision;
+  sendCommand(flags);
+  sensorWait(millis_for_flags(flags));
   
   sendCommand(CMD_ADC_READ);
   Wire.requestFrom(_address, 3);

@@ -12,7 +12,8 @@
 class Storage : public Print {
 public:
   enum SdStatus {DISABLED,NOCARD,ENABLED};
-  SdStatus status;
+  // may not be necessary - debuging Serial vs Storage issue
+  volatile SdStatus status;
 
   uint16_t frame_bytes;
   Storage(void) { log_to_serial=false; frame_bytes=2; sync_interval_blocks=30; }
@@ -29,20 +30,21 @@ public:
   
   // these are more like sub-setup, sub-loop, etc.
   // to be called from the sample loop
-  void setup(void);
+  // void setup(void); // wrapped into init()
   void loop(void);
   void cleanup(void);
 
   void info(void);
 
-  void store_frame(uint8_t *frame);
-  void open_block(uint8_t flags);
+  // void store_frame(uint8_t *frame);
+  void open_block();
   void close_block(void);
 
-  void open_next_file(void);
-  void set_next_active_filename(void);
   // DATAnnnn.BIN
   char active_filename[13];
+  void set_next_active_filename(void);
+  void open_next_file(void);
+  void close_file(void);
 
   uint8_t send_data(const char *filename,uint32_t start=0,uint32_t bytes=0);
 

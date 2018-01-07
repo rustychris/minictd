@@ -36,7 +36,6 @@ public:
   void write_header(void);
   void async_oneshot(void);
   void async_output(void);
-  
 };
 
 extern SeaDuck logger;

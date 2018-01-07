@@ -77,7 +77,7 @@ void common_adc_init(void) {
 
 SeaDuck::SeaDuck() 
 {
-  sample_interval_us=50000; // 20 Hz
+  sample_interval_us=100000; // 10 Hz
 
   num_sensors=4;
   sensors[0]=&pressure;
@@ -171,17 +171,27 @@ void SeaDuck::oneshot_sample(void) {
 
   async_oneshot();
     
-  while(sensors[0]->busy) ;
+  while(sensors[0]->busy) {
+    storage.loop();
+  }
+  storage.loop();
 }
 
 void SeaDuck::async_output(void) {
+  Print *out=&Serial;
+  
+  if( storage.status==Storage::ENABLED ) {
+    out=&storage;
+  }
+  
   for(int i=0;i<num_sensors;i++ ) {
     if ( sensors[i]->enabled ) {
-      sensors[i]->write_data(Serial);
+      sensors[i]->write_data(*out);
     }
   }
-  Serial.print("STOP\n"); 
-  Serial.flush();
+  // probably this moves elsewhere to keep output from continuous sampling cleaner.
+  out->print("STOP\n"); 
+  out->flush();
   pop_fn_and_call();
 }
 
@@ -200,13 +210,7 @@ void SeaDuck::async_oneshot(void) {
   pop_fn_and_call();  
 }
 
-// Below is the synchronous sampling loop
-// volatile int sample_flag=0;
-
 void timer_isr(void) {
-  // cli();
-  // sample_flag++;
-  // sei();
   if ( stack_size() > 0 ) {
     Serial.println("Skipping timed sample because the stack is not empty");
   } else {
@@ -214,7 +218,7 @@ void timer_isr(void) {
   }
 }
 
-// synchronous repeated sampling
+// asynchronous repeated sampling
 void SeaDuck::continuous_sample(void) {
   // for starters, go for some set number of seconds
   time_t t_start=Teensy3Clock.get();
@@ -222,8 +226,10 @@ void SeaDuck::continuous_sample(void) {
   Serial.println("# Starting interval timer loop");
   Timer.begin(timer_isr,sample_interval_us);
 
-  // Not sure why the compiler was complaining here, maybe it thought 2 was signed?
+  // Not sure why the compiler was complaining, but the time_t cast silences it
   while ( (time_t)Teensy3Clock.get() < (t_start+2) ) {
+    storage.loop();
+
     // Allow stopping the loop on ! or ESC
     if( Serial.available() ) {
       uint8_t c=Serial.read();
@@ -235,6 +241,7 @@ void SeaDuck::continuous_sample(void) {
   }
   Timer.end();
   while( stack_size() ) ; // let any currently running sampling code finish
+  storage.loop();
   
   Serial.println("# Exiting interval timer loop. ");
 }
