@@ -153,8 +153,7 @@ time_t SeaDuck::unixtime() {
   return clock.reading_seconds;
 }
 
-void SeaDuck::oneshot_sample(void) {
-  
+void SeaDuck::write_header(void) {
   Serial.print("[");
   for(int i=0;i<num_sensors;i++ ) {
     if ( sensors[i]->enabled ) {
@@ -162,53 +161,69 @@ void SeaDuck::oneshot_sample(void) {
     }
   }
   Serial.println("]");
-  
+}
+
+// header is written sync, and sampling and data output are async.
+void SeaDuck::oneshot_sample(void) {
+  write_header();
+
+  sensors[0]->push_busy(); // hack - borrow somebody's busy. maybe it shouldn't be in Sensors?
+
+  async_oneshot();
+    
+  while(sensors[0]->busy) ;
+}
+
+void SeaDuck::async_output(void) {
   for(int i=0;i<num_sensors;i++ ) {
     if ( sensors[i]->enabled ) {
-      sensors[i]->read();
       sensors[i]->write_data(Serial);
     }
   }
   Serial.print("STOP\n"); 
-  Serial.flush(); // having trouble seeing any of that stuff above.
+  Serial.flush();
+  pop_fn_and_call();
 }
 
-volatile int sample_flag=0;
+// async one-shot
+void SeaDuck::async_oneshot(void) {
+  // in this case, we don't output the header, since this fn will be
+  // the basis of async_continuous, and we only need the header once.
+  // This pointer might be a problem since SeaDuck is not a subclass of Sensor
+  push_fn((Sensor*)this,(SensorFn)&SeaDuck::async_output);
+  
+  for(int i=0;i<num_sensors;i++ ) {
+    if ( sensors[i]->enabled ) {
+      push_fn(sensors[i],(SensorFn)&Sensor::async_read);
+    }
+  }
+  pop_fn_and_call();  
+}
+
+// Below is the synchronous sampling loop
+// volatile int sample_flag=0;
 
 void timer_isr(void) {
-  cli();
-  sample_flag++;
-  sei();
+  // cli();
+  // sample_flag++;
+  // sei();
+  if ( stack_size() > 0 ) {
+    Serial.println("Skipping timed sample because the stack is not empty");
+  } else {
+    logger.async_oneshot();
+  }
 }
 
+// synchronous repeated sampling
 void SeaDuck::continuous_sample(void) {
-  // Development:
-  // 3. Fire sampling from this interrupt
-  // 4. Get on to recording to SD
-
-  // best approach is to use another timer, like IntervalTimer, and
-  //   read the RTC to get timestamps.
-
   // for starters, go for some set number of seconds
   time_t t_start=Teensy3Clock.get();
-  long start,loop_time;
 
   Serial.println("# Starting interval timer loop");
   Timer.begin(timer_isr,sample_interval_us);
 
-  int my_sample=sample_flag;
-  
-  while ( Teensy3Clock.get() < t_start+2 ) {
-    // spin wait for next sample to get triggered:
-    // Should check to see if this is actually safe.
-    while( my_sample == sample_flag ) ;
-    start=millis();
-    my_sample++;
-    
-    oneshot_sample();
-
-    loop_time=millis() - start;
-
+  // Not sure why the compiler was complaining here, maybe it thought 2 was signed?
+  while ( (time_t)Teensy3Clock.get() < (t_start+2) ) {
     // Allow stopping the loop on ! or ESC
     if( Serial.available() ) {
       uint8_t c=Serial.read();
@@ -219,7 +234,7 @@ void SeaDuck::continuous_sample(void) {
     }
   }
   Timer.end();
+  while( stack_size() ) ; // let any currently running sampling code finish
+  
   Serial.println("# Exiting interval timer loop. ");
-  Serial.print(loop_time);
-  Serial.println(" ms for last loop");
 }

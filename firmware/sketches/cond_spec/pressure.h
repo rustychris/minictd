@@ -6,7 +6,7 @@
 class Pressure : public Sensor {
 public:
   virtual void init();
-  virtual void read();
+  virtual void async_read();
   void display();
   
   virtual bool dispatch_command(const char *cmd, const char *cmd_arg);

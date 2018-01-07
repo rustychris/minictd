@@ -6,7 +6,7 @@
 class RTClock : public Sensor {
 public:
   virtual void init();
-  virtual void read();
+  virtual void async_read();
 
   virtual bool dispatch_command(const char *cmd, const char *cmd_arg);
   virtual void help();

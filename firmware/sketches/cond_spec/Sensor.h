@@ -15,7 +15,9 @@ public:
   }
   
   virtual void init(){};
-  virtual void read(){};
+  void read();
+  virtual void async_read(){};
+  
   virtual bool dispatch_command(const char *, const char *){return false;};
   virtual void help(){};
   virtual void write_frame_info(Print &out){};
@@ -33,11 +35,10 @@ extern binary_format_t binary_format;
 
 void write_base16(Print &out,uint8_t *buff,int count);
 
-// wacky function stack for ISRs
+// cheapo function stack for ISRs
 
 // stack of void (*)(void)
 typedef  void (Sensor::*SensorFn)(void);
-// typedef void (*SensorFn)(Sensor*);
 
 typedef struct {
   SensorFn fn;
@@ -48,5 +49,6 @@ typedef struct {
 void push_fn(Sensor *,SensorFn fn);
 void pop_fn(void); 
 void pop_fn_and_call(void);
+int stack_size();
 
 #endif // __SENSOR_H__

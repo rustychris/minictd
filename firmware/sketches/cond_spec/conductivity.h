@@ -14,7 +14,7 @@ public:
   Conductivity();
   
   void init();
-  void read();
+  virtual void async_read();
 
   void scan_setup();
   

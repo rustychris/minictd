@@ -8,9 +8,10 @@ void RTClock::init() {
   ;
 }
 
-void RTClock::read() {
+void RTClock::async_read() {
   reading_seconds = Teensy3Clock.get();
   reading_partial = RTC_TPR;
+  pop_fn_and_call();
 }
 
 bool RTClock::dispatch_command(const char *cmd, const char *cmd_arg) {

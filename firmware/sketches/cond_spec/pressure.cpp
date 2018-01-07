@@ -12,52 +12,30 @@ void Pressure::init(){
   sensor.begin();
 
   read();
-  pressure_baseline_dPa = pressure_abs_dPa;
+  
+  pressure_baseline_dPa = sensor._pressure_actual; // pressure_abs_dPa;
 }
 
-void Pressure::read() {
-  // Old way - works, but synchronous
-  if( 0 ) {
-    sensor.getMeasurements(ADC_4096);
-
-    Serial.print("Temp raw: ");
-    Serial.println(sensor.temperature_raw);
-    Serial.print("Press raw: ");
-    Serial.println(sensor.pressure_raw);
-  }
-
-  if( 1 ) {
-    push_busy();
-    
-    // New way - getting to async.
-    // set to known values to know if they actually ran.
-    sensor.temperature_raw=37;
-    sensor.pressure_raw=37;
-    // first is temperature precision, second is pressure precision
-    sensor.async_getMeasurements(ADC_4096,ADC_4096);
-    
-    while(busy);
-    //delay(40); // should be enough time?
-  }
-  
-  temperature_c100 = sensor._temperature_actual;
-
-  // 1 bar ~ 100kPa
-  // Read pressure from the sensor in mbar.  or is it tenths of Pa?
-  pressure_abs_dPa = sensor._pressure_actual;
+void Pressure::async_read() {
+  // set to known values to know if they actually ran.
+  sensor.temperature_raw=37;
+  sensor.pressure_raw=37;
+  // first is temperature precision, second is pressure precision
+  sensor.async_getMeasurements(ADC_4096,ADC_4096);
 }
 
 void Pressure::display(){
   read();
   
   Serial.print("temp_ms5803=");
-  Serial.println(temperature_c100 / 100.0f);
+  Serial.println(sensor._temperature_actual / 100.0f);
   
   Serial.print("press_abs_mbar=");
-  Serial.println(pressure_abs_dPa / 10.0f);
+  // use to use this->pressure_abs_dPa
+  Serial.println(sensor._pressure_actual / 10.0f);
      
   Serial.print("press_delta_dbar=");
-  Serial.println( ( (pressure_abs_dPa-pressure_baseline_dPa)/1000.0 ) ); 
+  Serial.println( ( (sensor._pressure_actual-pressure_baseline_dPa)/1000.0 ) ); 
 }
 
 bool Pressure::dispatch_command(const char *cmd, const char *cmd_arg) {

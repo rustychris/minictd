@@ -8,64 +8,23 @@ void Thermistor::init() {
 }
 volatile int dbridge;
 
-void Thermistor::read() {
+void Thermistor::async_read() {
   float dratio;
   float R;
 
   adc->setAveraging(32,NTC_ADC);
   
-  if ( 0 ) { // synchronous read
-    // use direct adc programming, or at least compatible with
-    // SeaDuck.cpp
-
-    //check_adc_error();
-    dbridge=adc->analogRead(NTC_SENSE,NTC_ADC);
-    //check_adc_error();
-
-    Serial.print("dbridge in sync: ");
-    Serial.println(dbridge);
-    // dbridge is a 4-byte int
+  // this could call wait_for_cal() if calibration is underway.
+  // generally should not.  But it looks like wait_for_cal()
+  // is safe.
     
-    // A0 is now referenced to 3.3v/2
-    // the bridge output is 3.3 * Rref/(Rntc+Rref)
-    // because the NTC is on top in the divider.
-    // the output of the inamp is (in-3.3/2) * 10 + 3.3/2
-    // dbridge = 3.3* ( 1/2 + NTC_GAIN * (Rref/(Rntc+Rref) - 1/2))
-    // or taking 3.3 as Aref, then we normalize ADC unipolar to [0,1]
+  push_fn(this,(SensorFn)&Thermistor::async_read_result);
+  adc->enableInterrupts(NTC_ADC);
 
-    //  1/2 + NTC_GAIN * (Rref/(Rntc+Rref) - 1/2)
-    dratio = (float)dbridge / (float)(1<<16); // normalized to [0,1]
-    // The first 0.5 is because the inamp's output is referenced to
-    // 0.5*3.3.  The second 0.5 is because the negating input of the 
-    // in amp is *also* set to 0.5*3.3.
-    dratio = (dratio - 0.5) / NTC_GAIN + 0.5; // Rref / (Rntc+Rref)
-    // dratio = Rref / (Rntc+Rref) - 1/2
-    // 1/dratio -1 = Rntc/Rref
-    R= NTC_R_REF*(1/dratio -1);
-  
-    //fiction!
-    reading=23.0 - (R-108000)*0.0005;
-  }
-
-  if(1) { // async
-    // this could call wait_for_cal() if calibration is underway.
-    // generally should not.  But it looks like wait_for_cal()
-    // is safe.
-
-
-    push_busy();
+  dbridge=0; // to know if it fails
     
-    push_fn(this,(SensorFn)&Thermistor::async_read_result);
-    adc->enableInterrupts(NTC_ADC);
-
-    dbridge=0; // to know if it fails
-    
-    adc->startSingleRead(NTC_SENSE,NTC_ADC);
-
-    while(this->busy>0) ;
-  }
+  adc->startSingleRead(NTC_SENSE,NTC_ADC);
 }
-
 
 // Is it really this simple?
 // kinetis.h references adc0_isr() and adc1_isr()

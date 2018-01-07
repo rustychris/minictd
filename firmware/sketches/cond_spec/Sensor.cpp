@@ -5,6 +5,12 @@
 
 IntervalTimer sensorTimer;
 
+void Sensor::read() {
+  push_busy();
+  async_read();
+  while(busy);
+}
+
 void Sensor::clear_busy(void) {
   busy--;
     
@@ -57,6 +63,10 @@ void write_base16(Print &out,uint8_t *buff,int count)
 // State that goes with the function stack
 volatile int fn_stack_i=0; // first unallocated
 volatile SensorClosure fn_stack[FN_STACK_MAX];
+
+int stack_size(void) {
+  return fn_stack_i;
+}
 
 void push_fn(Sensor *s, SensorFn fn)
 {

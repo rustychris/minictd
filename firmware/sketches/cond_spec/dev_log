@@ -241,3 +241,13 @@ the busy mechanism is not robust - no guard against using it
 when busy is already nonzero.  Well, added a simple print statement.
 
 Loop time down to 50ms, not sure how much of that is output.
+
+Packaging the async's together:
+  oneshot_sample: This should push one busywait, plus an async read for each
+    enabled sources, pop_fn_and_call(), and then wait.
+  So Sensor.read() should probably do that, but for a single sensor.
+
+That's working.
+
+HERE: need an asynchronous sampling loop, such that the main thread of
+control can tend to the SD card and check for abort on input.

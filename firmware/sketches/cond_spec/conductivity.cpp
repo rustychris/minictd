@@ -624,34 +624,16 @@ void Conductivity::scan() {
   scan_cleanup();
 }
 
-// read():
-//   Generic interface for SeaDuck, setup-to-cleanup scan,
-//   reducing the values to a conductivity value.
-void Conductivity::read() {
-  // Sync code:
-  if ( 0 ) {
-    scan_setup(); // 1ms
-    wait_for_scan(); // 100 ms
-    scan_reduce();
-    scan_cleanup(); // 0 ms
-  }
+void Conductivity::async_read() {
+  // there are two semi-independent events for continuing:
+  // ADC0 stops recording and ADC1 stops recording.
+  // Whoever finishes first will pop the nop, and the
+  // second will finish the process
 
-  // dev for async code
-  if ( 1 ) {
-    // there are two semi-independent events for continuing:
-    // ADC0 stops recording and ADC1 stops recording.
-    // Whoever finishes first will pop the nop, and the
-    // second will finish the process
-    push_busy();
-    
-    push_fn(this,(SensorFn)&Conductivity::async_scan_post);
-    push_fn(NULL,NULL);
+  push_fn(this,(SensorFn)&Conductivity::async_scan_post);
+  push_fn(NULL,NULL);
 
-    scan_setup(); // all immediate
-
-    while(busy);
-    //delay(200); // very liberal for the time being
-  }
+  scan_setup(); // all immediate
 }
 
 void Conductivity::async_scan_post() {
