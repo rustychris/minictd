@@ -5,6 +5,10 @@
 
 class Thermistor : public Sensor {
 public:
+  Thermistor() {
+    strcpy(name,"thermistor");
+  }
+  
   virtual void init();
   virtual void async_read();
 

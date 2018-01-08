@@ -269,8 +269,12 @@ loops, but not 30ms, so 28Hz.  That's 2 * 5ms delays.
 With a more drastic settings on conductivity, that can be 25ms for
 40Hz.
 
+Now reads commands from SD card.
+
 NEXT:
- - Read commands from SD card.
+ - Make sure there is discernible conductivity signal IRL.  It looked like
+   crap in open air.
+   
    At that point, the code is MVP.  Return to battery operation - is it possible
    to read over USB and run from battery at the same time?  May have to fab new
    board to get at trace to cut it.

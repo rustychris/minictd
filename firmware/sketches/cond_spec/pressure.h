@@ -5,6 +5,10 @@
 
 class Pressure : public Sensor {
 public:
+  Pressure() {
+    strcpy(name,"pressure");
+  }
+  
   virtual void init();
   virtual void async_read();
   void display();

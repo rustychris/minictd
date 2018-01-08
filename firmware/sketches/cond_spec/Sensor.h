@@ -10,8 +10,10 @@ extern IntervalTimer sensorTimer;
 
 class Sensor {
 public:
+  char name[25];
   Sensor() {
     enabled=true;
+    strcpy(name,"unknown");
   }
   
   virtual void init(){};

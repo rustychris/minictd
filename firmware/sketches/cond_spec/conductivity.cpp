@@ -99,6 +99,7 @@ Conductivity::Conductivity() {
   
   log_full_scan=true;
   log_reduced_scan=false;
+  strcpy(name,"conductivity");
 }
 
 void Conductivity::init(void) {

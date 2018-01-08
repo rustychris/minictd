@@ -83,7 +83,6 @@ void Storage::init(void) {
   }
     
   overruns = 0;
-  frame_count = 0;
 }
 
 void Storage::open_next_file(void) {
@@ -178,41 +177,6 @@ void Storage::cleanup(void) {
   }
 }
 
-// /** call this when a sample has been converted - will queue it in the
-//     right buffer.  safe for calling inside ISR */
-// void Storage::store_frame(uint8_t *frame) {
-//   // experiment to get low-latency serial output
-//   // if there is no backlog of blocks to be written, then
-//   // go ahead and flush this block so it can be written
-//   // sooner
-//   // if ( isrBuf && log_to_serial && (fullHead == fullTail) ) {
-//   //   close_block();
-//   // }
-//   
-//   // Get an appropriate block
-// 
-//   // // switch to a data block if necessary
-//   // if( isrBuf && ( (isrBuf->flags&FLAG_TYPE_MASK) == FLAG_TYPE_TEXT) ) {
-//   //   close_block();
-//   // }
-//   
-//   if ( !isrBuf ) {
-//     open_block();
-//     if(!isrBuf) return;
-//   }
-// 
-//   memcpy(&(isrBuf->data[isrBuf_pos]),
-//          frame,
-//          frame_bytes);
-//   isrBuf_pos+=frame_bytes;
-//   // isrBuf->frame_count++;
-// 
-//   // if no room for another frame, mark this one full
-//   if (DATA_DIM < isrBuf_pos+frame_bytes ) {
-//     close_block();
-//   }
-// }
-
 // only call when isrBuf==0 !
 void Storage::open_block() {
   if (emptyHead != emptyTail) {
@@ -245,7 +209,10 @@ void Storage::close_block(void){
 size_t Storage::write(uint8_t b) {
   if ( !isrBuf ) 
     open_block();
-  if ( !isrBuf ) return 0;
+  if ( !isrBuf ) {
+    overruns++;
+    return 0;
+  }
 
   isrBuf->data[isrBuf_pos++] = b;
   if( isrBuf_pos>=DATA_DIM ) // really should never be greater
@@ -255,9 +222,9 @@ size_t Storage::write(uint8_t b) {
 
 void Storage::info() 
 {
-  Serial.print("storage_status: ");
+  Serial.print("storage_status=");
   Serial.println(status);
-  Serial.print("storage_status_name: ");
+  Serial.print("storage_status_name=");
   if (status==DISABLED) {
     Serial.println("DISABLED");
   } else if (status==NOCARD) {
@@ -265,8 +232,8 @@ void Storage::info()
   } else if (status==ENABLED) {
     Serial.println("ENABLED");
   }
-  // Serial.print("log_to_serial: ");
-  // Serial.println(log_to_serial);
+  Serial.print("overruns=");
+  Serial.println(overruns);
 }
 
 bool confirm(void) {

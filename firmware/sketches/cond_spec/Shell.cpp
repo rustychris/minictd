@@ -56,13 +56,13 @@ bool Shell::activate_cmd_file(const char *fname) {
   // Check if file exists
   SdFile file; // Should this be SdFile ??
   if ( file.open(fname,O_READ) ) {
-    Serial.print("Found cmd file ");
+    Serial.print("# Found cmd file ");
     Serial.println(fname);
     strcpy(cmd_filename,fname);
     cmd_file_pos=0;
     return true;
   } else {
-    Serial.print("Failed to activate command file ");
+    Serial.print("# Command file not activated: ");
     Serial.println(fname);
     
     cmd_filename[0]='\0';

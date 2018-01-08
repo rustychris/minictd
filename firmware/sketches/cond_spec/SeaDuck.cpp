@@ -101,19 +101,24 @@ void SeaDuck::setup() {
              400000 // rate is 400kHz
              );
   
-  Serial.println("SeaDuck setup");
+  Serial.println("# SeaDuck setup");
   common_adc_init();
 
   binary_format=BIN_HEX;
   
   storage.init();
 
-  Serial.println("Storage init");
+  Serial.println("# Storage init");
   
   for(int i=0;i<num_sensors;i++){
-    Serial.println(i);
+    Serial.print("# ");
+    Serial.print(sensors[i]->name);
     sensors[i]->init();
+    Serial.println("   done");
   }
+
+  Serial.println("# Checking for " CMDFILE);
+  activate_cmd_file(CMDFILE);
 }
 
 void SeaDuck::dispatch_command() {

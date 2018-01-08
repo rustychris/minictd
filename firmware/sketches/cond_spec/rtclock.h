@@ -5,6 +5,10 @@
 
 class RTClock : public Sensor {
 public:
+  RTClock() {
+    strcpy(name,"realtimeclock");
+  }
+  
   virtual void init();
   virtual void async_read();
 
