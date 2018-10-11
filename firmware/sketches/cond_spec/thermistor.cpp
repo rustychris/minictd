@@ -1,5 +1,7 @@
 //-------------------Thermistor-------------//
-#include "seaduck_cfg.h"
+#include "cfg_seaduck.h"
+#ifdef HAS_NTC
+
 #include "SeaDuck.h"
 #include "thermistor.h"
 
@@ -108,3 +110,4 @@ void Thermistor::write_data(Print &out) {
   write_base16(out,(uint8_t*)(&reading),sizeof(reading));
   write_base16(out,(uint8_t*)(&dbridge),sizeof(dbridge));
 }
+#endif // HAS_NTC

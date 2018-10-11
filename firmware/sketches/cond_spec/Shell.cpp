@@ -43,7 +43,12 @@ void Shell::dispatch_command(void) {
     // but adapted to use registers from mk20dx128.h
     // not sure what the exact meaning of the bits are.
     // note that this DOES reset USB.
+#ifdef CORE_TEENSY
     SCB_AIRCR = 0x5FA0004;
+#else
+    // M0 reset: https://forum.arduino.cc/index.php?topic=379950.0
+    NVIC_SystemReset();
+#endif
     delay(100); // restart has a small lag
     // never gets here
   } else {

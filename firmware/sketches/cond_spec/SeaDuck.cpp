@@ -8,16 +8,27 @@
 #include "SdFunctions.h"
 #include "Sensor.h"
 
+#ifdef USE_TEENSY_ADC
 ADC *adc=new ADC();
+#endif
 
 IntervalTimer Timer;
 
 Pressure pressure;
+
+#ifdef HAS_CONDUCTIVITY
 Conductivity cond;
+#endif
+#ifdef HAS_NTC
 Thermistor ntc;
+#endif
+#ifdef HAS_RTCLOCK
 RTClock clock;
+#endif
+
 Storage storage;
 
+#ifdef USE_TEENSY_ADC
 void check_adc_error() {
   if ( adc->adc1->fail_flag != ADC_ERROR_CLEAR ) {
       Serial.print(" ADC1 error: ");
@@ -74,21 +85,31 @@ void common_adc_init(void) {
   SIM_SOPT7=0;
 }
 
+#endif // USE_ADC
+
 
 SeaDuck::SeaDuck() 
 {
+  int i=0;
   sample_interval_us=100000; // 10 Hz
 
   num_sensors=4;
-  sensors[0]=&pressure;
-  sensors[1]=&cond;
-  sensors[2]=&ntc;
-  sensors[3]=&clock;
-  
+  sensors[i++]=&pressure;
+#ifdef HAS_CONDUCTIVITY
+  sensors[i++]=&cond;
+#endif
+#ifdef HAS_NTC
+  sensors[i++]=&ntc;
+#endif
+#ifdef HAS_RTCLOCK
+  sensors[i++]=&clock;
+#endif
+
+#ifdef POWER_3V3_ENABLE_PIN
   pinMode(POWER_3V3_ENABLE_PIN,OUTPUT);
   digitalWrite(POWER_3V3_ENABLE_PIN,HIGH);
+#endif
 }
-
  
 void SeaDuck::setup() {
   Shell::setup();
@@ -102,7 +123,9 @@ void SeaDuck::setup() {
              );
   
   Serial.println("# SeaDuck setup");
+#ifdef USE_TEENSY_ADC
   common_adc_init();
+#endif
 
   binary_format=BIN_HEX;
   
@@ -225,14 +248,14 @@ void timer_isr(void) {
 
 // asynchronous repeated sampling
 void SeaDuck::continuous_sample(void) {
-  // for starters, go for some set number of seconds
-  time_t t_start=Teensy3Clock.get();
+  unsigned long t_start=millis();
 
   Serial.println("# Starting interval timer loop");
   Timer.begin(timer_isr,sample_interval_us);
 
-  // Not sure why the compiler was complaining, but the time_t cast silences it
-  while ( (time_t)Teensy3Clock.get() < (t_start+2) ) {
+  // This is just for testing anyway -- loop for a limited amount
+  // of time.
+  while ( millis()-t_start < 2000 ) {
     storage.loop();
 
     // Allow stopping the loop on ! or ESC

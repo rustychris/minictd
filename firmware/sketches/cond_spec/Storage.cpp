@@ -4,7 +4,7 @@
 /*  mainly to get efficient block writes */
 #include <Arduino.h>
 
-#include "seaduck_cfg.h"
+#include "cfg_seaduck.h"
 #include <SPI.h>
 #include <SdFat.h>
 

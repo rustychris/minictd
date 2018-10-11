@@ -72,3 +72,29 @@ Thinking towards the future:
 
   dispatch_command(): for module specific commands.  return true if handled,
     false if not.
+
+
+--------------------------------------------------------------------------------
+
+porting to feather:
+  remembering how it works now:
+    each sensors' async_read is pushed onto a stack.
+    those are called, and may additionally queue more calls, until the
+    stack is exhausted, at which point it gets to the bottom of the stack
+    which has the async_output.
+
+  async_conversion in ms5803.cpp seems to be the first place i2c is used.
+    -- why did I include Wire.onTransmitDone(NULL);
+  okay - this is the complicated one.  uses a sensorTimer to wait for the
+  conversion.
+  this cascades through things like
+    Wire.onReqFromDone(pop_fn_and_call);
+    Wire.sendRequest(_address, 3);
+
+  compared to standard Wire:
+    Wire.requestFrom()
+
+  and IntervalTimer??  that's only directly supported for 32-bit teensy boards.
+
+
+

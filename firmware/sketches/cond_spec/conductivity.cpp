@@ -1,3 +1,7 @@
+#include "cfg_seaduck.h"
+
+#ifdef HAS_CONDUCTIVITY
+
 #include <ADC.h>
 #include <DMAChannel.h> // used to be in quotes
 
@@ -861,3 +865,4 @@ int Conductivity::real_freq_hz() {
   // ordering here:
   return ((PDB_F0/BLOCKSIZE) * dac_per_adc*dac_out_stride)/pdb_period;
 }
+#endif // HAS_CONDUCTIVITY

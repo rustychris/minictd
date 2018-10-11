@@ -1,18 +1,21 @@
 #ifndef SEADUCK_H
 #define SEADUCK_H
 
+#include "cfg_seaduck.h"
+
+#if defined(HAS_CONDUCTIVITY) || defined(HAS_NTC)
+// at the moment cond/ntc are synonymous with teensy, though
+// that may change in the future
+#define USE_TEENSY_ADC
 #include <ADC.h>
-// #undef PDB_CONFIG // avoid clash between ADC and Audio
-// #include <utility/pdb.h>
+extern ADC *adc;
+#endif
 
 #include "Shell.h"
 #include <TimeLib.h>
 
 #include "Sensor.h"
 
-#include "seaduck_cfg.h"
-
-extern ADC *adc;
 
 class SeaDuck : public Shell
 {

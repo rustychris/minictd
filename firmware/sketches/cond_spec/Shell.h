@@ -9,6 +9,10 @@
 #define MODE_SAMPLE 1
 #define MODE_COMMAND 2
 
+// wasn't necessary on teensy, but maybe needed for feather
+// unsure of whether this will break teensy build.
+#include <inttypes.h>
+
 class Shell {
 protected:
   char label[LABEL_BUFFLEN];

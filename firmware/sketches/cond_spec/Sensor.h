@@ -6,6 +6,12 @@
 
 #include <SdFat.h>
 
+#ifdef ARDUINO_ARCH_SAMD
+// zero:
+#include "samd_IntervalTimer.h"
+#define IntervalTimer SAMD_IntervalTimer
+#endif
+
 extern IntervalTimer sensorTimer;
 
 class Sensor {

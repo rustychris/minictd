@@ -1,8 +1,11 @@
-#include <core_pins.h> // needed for Teensy3Clock
 #include <TimeLib.h>
 
 #include "SeaDuck.h"
 #include "rtclock.h"
+
+#ifdef RTC_TEENSY
+# include <core_pins.h> // needed for Teensy3Clock
+#endif // RTC_TEENSY
 
 void RTClock::init() {
   ;

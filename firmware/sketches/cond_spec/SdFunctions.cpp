@@ -17,7 +17,7 @@
  */
 #include <Arduino.h>
 
-#include "seaduck_cfg.h"
+#include "cfg_seaduck.h"
 
 // Test with reduced SPI speed for breadboards.  SD_SCK_MHZ(4) will select 
 // the highest speed supported by the board that is not over 4 MHz.
