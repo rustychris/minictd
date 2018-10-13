@@ -30,7 +30,14 @@ Distributed as-is; no warranty is given.
 
 #pragma GCC optimize ("O0")
 
+#ifdef CORE_TEENSY
 #include "i2c_t3_local.h" // Wire library is used for I2C
+#define ASYNC_I2C
+#else
+#include <Wire.h>
+#undef ASYNC_I2C
+#endif
+
 #include "Sensor.h"
 #include "ms5803.h"
 
@@ -40,8 +47,7 @@ MS5803 *the_ms5803;
 MS5803::MS5803(ms5803_addr address)
 // Base library type I2C
 {
-  // Wire.begin(); // this gets called at a more controlled time in SeaDuck::setup()
-  _address = address; //set interface used for communication
+  _address = address; // set interface used for communication
 
   the_ms5803=this;  
 }
@@ -181,8 +187,13 @@ void MS5803::raw_to_actual(void)
 void MS5803::async_sendRead() {
   Wire.beginTransmission( _address );
   Wire.write(CMD_ADC_READ);
+#ifdef ASYNC_I2C
   Wire.onTransmitDone(pop_fn_and_call); 
   Wire.sendTransmission();
+#else
+  Wire.endTransmission();
+  pop_fn_and_call();
+#endif
 }
 
 void MS5803::async_getADC_temp()
@@ -240,15 +251,26 @@ void MS5803::async_conversion(uint8_t flags)
   if ( ! sensorTimer.begin(end_delay_and_pop,1000*delay_ms) ) {
     Serial.println("No timers available!");
   }
+#ifdef ASYNC_I2C
   // make sure that we do not trigger an ISR on transmit done
   Wire.onTransmitDone(NULL);
   Wire.sendTransmission();
+#else
+  Wire.endTransmission();
+#endif
 }
 
 void MS5803::async_request_three(void)
 {
+#ifdef ASYNC_I2C
   Wire.onReqFromDone(pop_fn_and_call);
   Wire.sendRequest(_address, 3);
+#else
+  Wire.requestFrom(_address, 3);
+  // next is async_readTemp or async_readPress -
+  // I think it's safe to just drop into those directly
+  pop_fn_and_call();
+#endif
 }
 
 void MS5803::async_readTemp(void)
@@ -256,11 +278,11 @@ void MS5803::async_readTemp(void)
   uint8_t highByte = 0, midByte = 0, lowByte = 0;
 
   while(Wire.available()) // RH: not sure why that's a loop..   
-  { 
-    highByte = Wire.read();
-    midByte = Wire.read();
-    lowByte = Wire.read();  
-  }
+    { 
+      highByte = Wire.read();
+      midByte = Wire.read();
+      lowByte = Wire.read();  
+    }
   
   temperature_raw=((uint32_t)highByte << 16) + ((uint32_t)midByte << 8) + lowByte;
 
@@ -272,11 +294,11 @@ void MS5803::async_readPress(void)
 {
   uint8_t highByte = 0, midByte = 0, lowByte = 0;
   while(Wire.available()) // RH: not sure why that's a loop..   
-  {
-    highByte = Wire.read();
-    midByte = Wire.read();
-    lowByte = Wire.read();  
-  }
+    {
+      highByte = Wire.read();
+      midByte = Wire.read();
+      lowByte = Wire.read();  
+    }
   
   pressure_raw=((uint32_t)highByte << 16) + ((uint32_t)midByte << 8) + lowByte;
 
@@ -285,9 +307,11 @@ void MS5803::async_readPress(void)
 
 void MS5803::async_raw_to_actual(void)
 {
+#ifdef ASYNC_I2C
   Wire.onTransmitDone(NULL);
   Wire.onReqFromDone(NULL);
-  
+#endif
+
   raw_to_actual();
 
   pop_fn_and_call();

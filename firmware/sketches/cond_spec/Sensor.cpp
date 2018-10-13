@@ -26,7 +26,10 @@ void Sensor::push_busy(void) {
     Serial.println("FAIL busy is already nonzero");
   }
   busy++;
-  push_fn(this,(SensorFn)&Sensor::clear_busy);
+  // this line causes an internal compiler error for M0.
+  //push_fn(this,(SensorFn)(&Sensor::clear_busy));
+  // but this is okay.
+  push_fn(this,&Sensor::clear_busy);
 }
 
 binary_format_t binary_format;

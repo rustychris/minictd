@@ -12,8 +12,15 @@ void RTClock::init() {
 }
 
 void RTClock::async_read() {
+#ifdef RTC_TEENSY
   reading_seconds = Teensy3Clock.get();
   reading_partial = RTC_TPR;
+#else
+  // Eventually replace with DS1307 call
+#warning "FIX FOR DS1307"
+  reading_seconds = now();
+  reading_partial = 0;
+#endif
   pop_fn_and_call();
 }
 

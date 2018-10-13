@@ -46,7 +46,7 @@ void write_base16(Print &out,uint8_t *buff,int count);
 // cheapo function stack for ISRs
 
 // stack of void (*)(void)
-typedef  void (Sensor::*SensorFn)(void);
+typedef void (Sensor::*SensorFn)(void);
 
 typedef struct {
   SensorFn fn;

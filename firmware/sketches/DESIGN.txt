@@ -96,5 +96,9 @@ porting to feather:
 
   and IntervalTimer??  that's only directly supported for 32-bit teensy boards.
 
-
+  maybe have an interval timer solution, but I2C is stickier.  the code strongly
+  assumes that i2c can run async.  all of the sensor code runs as interrupt handlers.
+  using synchoronous i2c is doubly bad: SDfat gets no time to actually do the writing,
+  and likely some parts of the sync i2c code use interrupts behind the scenes, which
+  may fail when run inside an interrupt handler.
 

@@ -1,4 +1,9 @@
+#ifdef CORE_TEENSY
 #include "i2c_t3_local.h"
+#else
+#include <Wire.h>
+#endif
+
 
 #include "SeaDuck.h"
 #include "pressure.h"
@@ -114,6 +119,7 @@ SeaDuck::SeaDuck()
 void SeaDuck::setup() {
   Shell::setup();
 
+#ifdef CORE_TEENSY
   // have to select non-default pins
   Wire.begin(I2C_MASTER, // mode
              0, // address - ignored
@@ -121,6 +127,9 @@ void SeaDuck::setup() {
              I2C_PULLUP_EXT, // we have external pullups
              400000 // rate is 400kHz
              );
+#else
+  Wire.begin();
+#endif
   
   Serial.println("# SeaDuck setup");
 #ifdef USE_TEENSY_ADC
