@@ -231,8 +231,7 @@ void MS5803::async_getADC_press(void)
 
 void end_delay_and_pop() {
   sensorTimer.end();
-  
-  pop_fn_and_call(); 
+  pop_fn_and_call();
 }
 
 // start the conversion process

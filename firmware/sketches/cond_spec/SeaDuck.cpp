@@ -95,19 +95,18 @@ void common_adc_init(void) {
 
 SeaDuck::SeaDuck() 
 {
-  int i=0;
   sample_interval_us=100000; // 10 Hz
 
-  num_sensors=4;
-  sensors[i++]=&pressure;
+  num_sensors=0;
+  sensors[num_sensors++]=&pressure;
 #ifdef HAS_CONDUCTIVITY
-  sensors[i++]=&cond;
+  sensors[num_sensors++]=&cond;
 #endif
 #ifdef HAS_NTC
-  sensors[i++]=&ntc;
+  sensors[num_sensors++]=&ntc;
 #endif
 #ifdef HAS_RTCLOCK
-  sensors[i++]=&clock;
+  sensors[num_sensors++]=&clock;
 #endif
 
 #ifdef POWER_3V3_ENABLE_PIN
@@ -132,6 +131,7 @@ void SeaDuck::setup() {
 #endif
   
   Serial.println("# SeaDuck setup");
+
 #ifdef USE_TEENSY_ADC
   common_adc_init();
 #endif

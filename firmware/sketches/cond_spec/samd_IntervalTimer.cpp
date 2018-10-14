@@ -1,8 +1,9 @@
 #include "samd_IntervalTimer.h"
 
 //define the interrupt handlers
-void TC3_Handler(){
-  Adafruit_ZeroTimer::timerHandler(3);
+// these must match whatever is in the constructor
+void TC4_Handler(){
+  Adafruit_ZeroTimer::timerHandler(4);
 }
 
 // trim it down to the most direct signature
@@ -46,6 +47,7 @@ bool SAMD_IntervalTimer::begin(void (*funct)(), unsigned int period_us)
   // these probably okay
   setCallback(true, TC_CALLBACK_CC_CHANNEL1, funct);
   enable(true);
+  return true;
 }
 
 void SAMD_IntervalTimer::end(void)

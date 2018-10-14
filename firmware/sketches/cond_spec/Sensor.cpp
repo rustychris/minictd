@@ -8,6 +8,7 @@ IntervalTimer sensorTimer;
 
 void Sensor::read() {
   push_busy();
+  // HERE
   async_read();
   while(busy);
 }
