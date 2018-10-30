@@ -21,6 +21,12 @@
 #include "thermistor.h"
 #endif
 
+#ifdef HAS_IMU
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BNO055.h>
+#include <utility/imumaths.h>
+#endif
+
 #include "rtclock.h"
 #include "SdFunctions.h"
 

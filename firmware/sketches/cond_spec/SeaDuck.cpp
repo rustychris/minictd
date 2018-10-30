@@ -12,6 +12,7 @@
 #include "rtclock.h"
 #include "SdFunctions.h"
 #include "Sensor.h"
+#include "imu.h"
 
 #ifdef USE_TEENSY_ADC
 ADC *adc=new ADC();
@@ -29,6 +30,10 @@ Thermistor ntc;
 #endif
 #ifdef HAS_RTCLOCK
 RTClock clock;
+#endif
+
+#ifdef HAS_IMU
+IMU imu;
 #endif
 
 Storage storage;
@@ -107,6 +112,10 @@ SeaDuck::SeaDuck()
 #endif
 #ifdef HAS_RTCLOCK
   sensors[num_sensors++]=&clock;
+#endif
+
+#ifdef HAS_IMU
+  sensors[num_sensors++]=&imu;
 #endif
 
 #ifdef POWER_3V3_ENABLE_PIN
