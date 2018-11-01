@@ -114,7 +114,9 @@ public:
   // volatile may not be necessary - trying while debugging pressure=0 problem.
   volatile int32_t temperature_raw;
   volatile int32_t pressure_raw;
-  
+
+  uint8_t crc4(void);
+
 private:
   
   ms5803_addr _address;     // Variable used to store I2C device address.

@@ -39,6 +39,7 @@ Distributed as-is; no warranty is given.
 #include <Wire.h>
 #undef ASYNC_I2C
 
+
 // typical, using builtin Wire
 // #define PRESS_WIRE Wire
 
@@ -51,13 +52,96 @@ Distributed as-is; no warranty is given.
 // And here...
 // /home/rusty/.arduino15/packages/adafruit/hardware/samd/1.2.3/cores/arduino/SERCOM.h
 // remove private section around line 215
-#include "async_samd_wire.h"
 
-AsyncTwoWire myWire(&sercom1, 11, 13);
-void SERCOM1_Handler(void) {
-  myWire.onService();
-}
-#define PRESS_WIRE myWire
+// not working.
+// #include "async_samd_wire.h"
+// AsyncTwoWire myWire(&sercom1, 11, 13);
+// void SERCOM1_Handler(void) {
+//   myWire.onService();
+// }
+
+#define USE_I2C_DMAC
+
+#ifndef USE_I2C_DMAC
+TwoWire PRESS_WIRE(&sercom1, 11, 13);
+#else
+
+// Try a more grown-up async i2c, using DMA.
+// This runs, passes CRC, but returns bad pressure and temperature
+
+#include "I2C_DMAC.h"
+
+class MyI2C {
+public:
+  I2C_DMAC I2C1;
+  MyI2C(void) : I2C1(&sercom1,11,13) {
+    ;
+  };
+  void begin(void) {
+    I2C1.begin(400000);      // Start I2C bus at 400kHz          
+    I2C1.setWriteChannel(2); // Set the I2C1 DMAC write channel to 2
+    I2C1.setReadChannel(3);  // Set the I2C1 DMAC read channel to 3
+    // Assign pins 13 & 11 to SERCOM functionality
+    pinPeripheral(11, PIO_SERCOM); // SDA
+    pinPeripheral(13, PIO_SERCOM); // SCL
+  }
+
+  uint8_t _address;
+  uint8_t read_ptr,write_ptr;
+  uint8_t buff_len;
+  uint8_t buffer[100];
+  void sendRequest(uint8_t address,int count) {
+    read_ptr=0;
+    buff_len=count; // premature...
+		I2C1.readBytes(address, buffer, count);
+  }
+  void requestFrom(uint8_t address,int count) {
+    sendRequest(address,count);
+    while(I2C1.readBusy) ;
+  };
+  uint8_t read(void) {
+    if(read_ptr<buff_len) {
+      return buffer[read_ptr++];
+    }
+    Serial.println("Read past end of buffer");
+    return 0;
+  }
+  bool available(void) {
+    return read_ptr<buff_len;
+  }
+
+  uint8_t xmit_address;
+  void beginTransmission(uint8_t address) {
+    _address=address;
+    write_ptr=0;
+  }
+  uint8_t write(uint8_t data) {
+    buffer[write_ptr]=data;
+    write_ptr++;
+    return 1;
+  }
+  void onTransmitDone(void (*callback)(void)) {
+    I2C1.attachWriteCallback(callback);
+  }
+  void onReqFromDone(void (*callback)(void)) {
+    I2C1.attachReadCallback(callback);
+  }
+
+  void sendTransmission(void) {
+    I2C1.initWriteBytes(_address, buffer, write_ptr);
+    I2C1.write();
+  }
+  uint8_t endTransmission(void) {
+    sendTransmission();
+    // Serial.println("endTransmission: write spinning");
+    while(I2C1.writeBusy);
+    // Serial.println("endTransmission: exit spinning");
+    return 0; // not sure how to get proper status
+  }
+};
+MyI2C PRESS_WIRE;
+#define ASYNC_I2C
+#endif // USE_I2C_DMAC
 
 #endif
 
@@ -75,20 +159,54 @@ MS5803::MS5803(ms5803_addr address)
   the_ms5803=this;  
 }
 
+// from AN520
+uint8_t MS5803::crc4(void)
+{
+  int cnt; // simple counter
+  unsigned int n_rem; // crc reminder
+  unsigned int crc_read; // original value of the crc
+  uint8_t n_bit;
+  n_rem = 0x00;
+  crc_read=coefficient[7]; //save read CRC
+  coefficient[7]=(0xFF00 & (coefficient[7])); //CRC byte is replaced by 0
+  for (cnt = 0; cnt < 16; cnt++) // operation is performed on bytes
+    { // choose LSB or MSB
+      if (cnt%2==1) n_rem ^= (unsigned short) ((coefficient[cnt>>1]) & 0x00FF);
+      else n_rem ^= (unsigned short) (coefficient[cnt>>1]>>8);
+      for (n_bit = 8; n_bit > 0; n_bit--)
+        {
+          if (n_rem & (0x8000))
+            {
+              n_rem = (n_rem << 1) ^ 0x3000;
+            }
+          else
+            {
+              n_rem = (n_rem << 1);
+            }
+        }
+    }
+  n_rem= (0x000F & (n_rem >> 12)); // // final 4-bit reminder is CRC code
+  coefficient[7]=crc_read; // restore the crc_read to its original place
+  return (n_rem ^ 0x00);
+} 
+
 void MS5803::reset(void)
 // Reset device I2C
 {
-  Serial.println("ms5803:reset()");
-  myWire.begin(); // only for special wire object
-  Serial.println("ms5803:reset() myWire.begin() okay");
-  // Assign pins 13 & 11 to SERCOM functionality
+  // Serial.println("ms5803:reset()");
+  PRESS_WIRE.begin(); // only for special wire object
+#ifndef USE_I2C_DMAC
   pinPeripheral(11, PIO_SERCOM); // SDA
   pinPeripheral(13, PIO_SERCOM); // SCL
+#endif
+  
+  // Serial.println("ms5803:reset() myWire.begin() okay");
   
   delay(10); // maybe helps??
 
   sendCommand(CMD_RESET);
   sensorWait(3);
+  // Serial.println("ms5803:after reset, waited 3ms");
 }
 
 uint8_t MS5803::begin(void)
@@ -102,11 +220,19 @@ uint8_t MS5803::begin(void)
     uint8_t highByte = PRESS_WIRE.read(); 
     uint8_t lowByte = PRESS_WIRE.read();
     coefficient[i] = (highByte << 8)|lowByte;
-    // Uncomment below for debugging output.
-    //   Serial.print("C");
-    //   Serial.print(i);
-    //   Serial.print("= ");
-    //   Serial.println(coefficient[i]);
+    // // Uncomment below for debugging output.
+    // Serial.print("C");
+    // Serial.print(i);
+    // Serial.print("= ");
+    // Serial.println(coefficient[i]);
+  }
+  
+  // Serial.print("CRC calculated: ");
+  // Serial.println(crc4());
+  // Serial.print("CRC fetched: ");
+  // Serial.println(coefficient[7]&0x000F);
+  if ( crc4() != coefficient[7]&0x000F ) {
+    Serial.println("ERROR: ms5803 CRC check failed");
   }
 
   return 0;
@@ -204,8 +330,6 @@ void MS5803::raw_to_actual(void)
   SENS = SENS - SENS2;
 
   // Now lets calculate the pressure
-  
-
   pressure_calc = (((SENS * pressure_raw) / 2097152 ) - OFF) / 32768;
   
   _temperature_actual = temp_calc ;
@@ -217,13 +341,19 @@ void MS5803::raw_to_actual(void)
 // sent.
 
 void MS5803::async_sendRead() {
+  // this adds a bit of delay and fixes the
+  // Serial.println("sendRead called (from timer?)");
+
   PRESS_WIRE.beginTransmission( _address );
   PRESS_WIRE.write(CMD_ADC_READ);
+
 #ifdef ASYNC_I2C
-  PRESS_WIRE.onTransmitDone(pop_fn_and_call); 
+  PRESS_WIRE.onTransmitDone(pop_fn_and_call);
+  // Serial.println("async_sendRead() about to sendTransmission");
   PRESS_WIRE.sendTransmission();
 #else
   PRESS_WIRE.endTransmission();
+  // Serial.println("async_sendRead => pop_fn_and_call");
   pop_fn_and_call();
 #endif
 }
@@ -235,6 +365,7 @@ void MS5803::async_getADC_temp()
   push_fn(this,(SensorFn)&MS5803::async_sendRead);
 
   async_conversion(TEMPERATURE+temp_precision);
+  // Serial.println("Issued temp conversion");
 }
 
 // Starts the chain of functions to ultimately get a new
@@ -249,6 +380,7 @@ void MS5803::async_getMeasurements(precision _temp_precision,precision _press_pr
   push_fn(this,(SensorFn)&MS5803::async_getADC_temp);
   push_fn(this,(SensorFn)&MS5803::async_getADC_press);
   // set this in motion
+  // Serial.println("async_getMeasurements => pop_fn_and_call");
   pop_fn_and_call();
 }
 
@@ -259,10 +391,12 @@ void MS5803::async_getADC_press(void)
   push_fn(this,(SensorFn)&MS5803::async_sendRead);
 
   async_conversion(PRESSURE+press_precision);
+  // Serial.println("Issued pressure conversion");
 }
 
 void end_delay_and_pop() {
   sensorTimer.end();
+  // Serial.println("End delay and pop ISR => pop_fn_and_call");
   pop_fn_and_call();
 }
 
@@ -273,15 +407,6 @@ void MS5803::async_conversion(uint8_t flags)
   PRESS_WIRE.beginTransmission( _address);
   PRESS_WIRE.write(CMD_ADC_CONV + flags);
 
-  // HERE - technically we should wait until the transmit completes,
-  // and then wait for 11ms.  But it's the 11ms that really holds things
-  // up, so this should be a timed interrupt call instead of async i2c.
-  // PRESS_WIRE.onTransmitDone(pop_fn_and_call);
-  uint32_t delay_ms=millis_for_flags(flags);
-    
-  if ( ! sensorTimer.begin(end_delay_and_pop,1000*delay_ms) ) {
-    Serial.println("No timers available!");
-  }
 #ifdef ASYNC_I2C
   // make sure that we do not trigger an ISR on transmit done
   PRESS_WIRE.onTransmitDone(NULL);
@@ -289,17 +414,31 @@ void MS5803::async_conversion(uint8_t flags)
 #else
   PRESS_WIRE.endTransmission();
 #endif
+
+  // HERE - technically we should wait until the transmit completes,
+  // and then wait for 11ms.  But it's the 11ms that really holds things
+  // up, so this should be a timed interrupt call instead of async i2c.
+  uint32_t delay_ms=millis_for_flags(flags);
+  // Serial.println("About to start timer");
+    
+  if ( ! sensorTimer.begin(end_delay_and_pop,1000*(100+delay_ms)) ) {
+    Serial.println("No timers available!");
+  }
+  
+  // Serial.println("end of async_conversion");
 }
 
 void MS5803::async_request_three(void)
 {
 #ifdef ASYNC_I2C
+  PRESS_WIRE.onTransmitDone(NULL); // keep this from being called again.
   PRESS_WIRE.onReqFromDone(pop_fn_and_call);
   PRESS_WIRE.sendRequest(_address, 3);
 #else
   PRESS_WIRE.requestFrom(_address, 3);
   // next is async_readTemp or async_readPress -
   // I think it's safe to just drop into those directly
+  // Serial.println("async_request_three => pop_fn_and_call");
   pop_fn_and_call();
 #endif
 }
@@ -307,6 +446,11 @@ void MS5803::async_request_three(void)
 void MS5803::async_readTemp(void)
 {
   uint8_t highByte = 0, midByte = 0, lowByte = 0;
+
+#ifdef ASYNC_I2C
+  PRESS_WIRE.onTransmitDone(NULL);
+  PRESS_WIRE.onReqFromDone(NULL);
+#endif
 
   while(PRESS_WIRE.available()) // RH: not sure why that's a loop..   
     { 
@@ -317,6 +461,7 @@ void MS5803::async_readTemp(void)
   
   temperature_raw=((uint32_t)highByte << 16) + ((uint32_t)midByte << 8) + lowByte;
 
+  // Serial.println("async_readTemp => pop_fn_and_call");
   pop_fn_and_call();
 }
 
@@ -324,6 +469,12 @@ void MS5803::async_readTemp(void)
 void MS5803::async_readPress(void)
 {
   uint8_t highByte = 0, midByte = 0, lowByte = 0;
+
+#ifdef ASYNC_I2C
+  PRESS_WIRE.onTransmitDone(NULL);
+  PRESS_WIRE.onReqFromDone(NULL);
+#endif
+
   while(PRESS_WIRE.available()) // RH: not sure why that's a loop..   
     {
       highByte = PRESS_WIRE.read();
@@ -345,6 +496,7 @@ void MS5803::async_raw_to_actual(void)
 
   raw_to_actual();
 
+  // Serial.println("async_raw_to_actual => pop_fn_and_call");
   pop_fn_and_call();
 }
 
@@ -385,7 +537,6 @@ uint32_t MS5803::getADCconversion(measurement _measurement, precision _precision
   result = ((uint32_t)highByte << 16) + ((uint32_t)midByte << 8) + lowByte;
 
   return result;
-
 }
 
 void MS5803::sendCommand(uint8_t command)
@@ -397,8 +548,8 @@ void MS5803::sendCommand(uint8_t command)
   //Serial.println(status);
 
   status=PRESS_WIRE.endTransmission();
-  Serial.print("ms5803 sendCommand: status=");
-  Serial.println(status);
+  // Serial.print("ms5803 sendCommand: status=");
+  // Serial.println(status);
 }
 
 void MS5803::sensorWait(uint8_t time)

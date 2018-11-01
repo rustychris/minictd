@@ -1,4 +1,4 @@
-/* 
+/*
    Abstact base class for individual sensors
  */
 #ifndef __SENSOR_H__

@@ -17,6 +17,13 @@
 
 #include "SeaDuck.h"
 #include "ms5803.h"
+
+#ifndef CORE_TEENSY
+// SAMD async I2C
+#include "I2C_DMAC.h"
+#include "DMAC.h"
+#endif
+
 #ifdef HAS_NTC
 #include "thermistor.h"
 #endif
