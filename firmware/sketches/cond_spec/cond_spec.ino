@@ -6,7 +6,10 @@
 #include <SPI.h>
 #include <SdFat.h>
 
+#ifdef CORE_TEENSY
 #include "i2c_t3_local.h"
+#endif
+
 #include <TimeLib.h>
 
 #ifdef HAS_CONDUCTIVITY

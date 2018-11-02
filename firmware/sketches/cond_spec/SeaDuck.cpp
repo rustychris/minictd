@@ -1,7 +1,8 @@
 #ifdef CORE_TEENSY
 #include "i2c_t3_local.h"
 #else
-#include <Wire.h>
+// #include <Wire.h>
+#include "i2c_m0_local.h"
 #endif
 
 
@@ -12,7 +13,7 @@
 #include "rtclock.h"
 #include "SdFunctions.h"
 #include "Sensor.h"
-#include "imu.h"
+// #include "imu.h"
 
 #ifdef USE_TEENSY_ADC
 ADC *adc=new ADC();
@@ -136,7 +137,7 @@ void SeaDuck::setup() {
              400000 // rate is 400kHz
              );
 #else
-  Wire.begin();
+  AWire.begin();
 #endif
   
   Serial.println("# SeaDuck setup");

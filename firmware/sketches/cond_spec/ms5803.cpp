@@ -35,86 +35,11 @@ Distributed as-is; no warranty is given.
 #include "i2c_t3_local.h" // Wire library is used for I2C
 #define ASYNC_I2C
 #else
-#include <Wire.h>
-// using a homemade Wire -
-#include "wiring_private.h" // pinPeripheral() function
-#include "I2C_DMAC.h"
+#include "i2c_m0_local.h"
 #define ASYNC_I2C
-
-#define I2C1 I2C
-class MyI2C {
-public:
-  // I2C_DMAC I2C1;
-  //MyI2C(void) : I2C1(&sercom1,11,13) {
-  // try it with the standard I2C
-  MyI2C(void) {
-    ;
-  };
-  void begin(void) {
-    I2C1.begin(400000);      // Start I2C bus at 400kHz          
-    I2C1.setWriteChannel(2); // Set the I2C1 DMAC write channel to 2
-    I2C1.setReadChannel(3);  // Set the I2C1 DMAC read channel to 3
-    // Assign pins 13 & 11 to SERCOM functionality
-    // pinPeripheral(11, PIO_SERCOM); // SDA
-    // pinPeripheral(13, PIO_SERCOM); // SCL
-  }
-
-  uint8_t _address;
-  uint8_t read_ptr,write_ptr;
-  uint8_t buff_len;
-  uint8_t buffer[100];
-  void sendRequest(uint8_t address,int count) {
-    read_ptr=0;
-    buff_len=count; // premature...
-		I2C1.readBytes(address, buffer, count);
-  }
-  void requestFrom(uint8_t address,int count) {
-    sendRequest(address,count);
-    while(I2C1.readBusy) ;
-  };
-  uint8_t read(void) {
-    if(read_ptr<buff_len) {
-      return buffer[read_ptr++];
-    }
-    Serial.println("Read past end of buffer");
-    return 0;
-  }
-  bool available(void) {
-    return read_ptr<buff_len;
-  }
-
-  uint8_t xmit_address;
-  void beginTransmission(uint8_t address) {
-    _address=address;
-    write_ptr=0;
-  }
-  uint8_t write(uint8_t data) {
-    buffer[write_ptr]=data;
-    write_ptr++;
-    return 1;
-  }
-  void onTransmitDone(void (*callback)(void)) {
-    I2C1.attachWriteCallback(callback);
-  }
-  void onReqFromDone(void (*callback)(void)) {
-    I2C1.attachReadCallback(callback);
-  }
-
-  void sendTransmission(void) {
-    I2C1.initWriteBytes(_address, buffer, write_ptr);
-    I2C1.write();
-  }
-  uint8_t endTransmission(void) {
-    sendTransmission();
-    // Serial.println("endTransmission: write spinning");
-    while(I2C1.writeBusy);
-    // Serial.println("endTransmission: exit spinning");
-    return 0; // not sure how to get proper status
-  }
-};
-MyI2C PRESS_WIRE;
-
 #endif
+
+#define PRESS_WIRE AWire
 
 #include "Sensor.h"
 #include "ms5803.h"
@@ -165,11 +90,7 @@ void MS5803::reset(void)
 // Reset device I2C
 {
   // Serial.println("ms5803:reset()");
-  PRESS_WIRE.begin(); // only for special wire object
-#ifndef USE_I2C_DMAC
-  pinPeripheral(11, PIO_SERCOM); // SDA
-  pinPeripheral(13, PIO_SERCOM); // SCL
-#endif
+  // PRESS_WIRE.begin(); // only for special wire object
   
   // Serial.println("ms5803:reset() myWire.begin() okay");
   
@@ -310,6 +231,7 @@ void MS5803::raw_to_actual(void)
 
 // this gets called once the conversion request has been
 // sent.
+void pop_fn_and_call(void); // try duplicate prototype
 
 void MS5803::async_sendRead() {
   // this adds a bit of delay and fixes the
@@ -319,7 +241,8 @@ void MS5803::async_sendRead() {
   PRESS_WIRE.write(CMD_ADC_READ);
 
 #ifdef ASYNC_I2C
-  PRESS_WIRE.onTransmitDone(pop_fn_and_call);
+  // unclear why this cast is necessary
+  PRESS_WIRE.onTransmitDone(( void (*)(void) )pop_fn_and_call);
   // Serial.println("async_sendRead() about to sendTransmission");
   PRESS_WIRE.sendTransmission();
 #else
@@ -403,7 +326,8 @@ void MS5803::async_request_three(void)
 {
 #ifdef ASYNC_I2C
   PRESS_WIRE.onTransmitDone(NULL); // keep this from being called again.
-  PRESS_WIRE.onReqFromDone(pop_fn_and_call);
+  // unclear why this cast is needed.
+  PRESS_WIRE.onReqFromDone( (void (*)(void))pop_fn_and_call);
   PRESS_WIRE.sendRequest(_address, 3);
 #else
   PRESS_WIRE.requestFrom(_address, 3);
