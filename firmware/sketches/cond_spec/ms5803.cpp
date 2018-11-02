@@ -35,46 +35,19 @@ Distributed as-is; no warranty is given.
 #include "i2c_t3_local.h" // Wire library is used for I2C
 #define ASYNC_I2C
 #else
-
 #include <Wire.h>
-#undef ASYNC_I2C
-
-
-// typical, using builtin Wire
-// #define PRESS_WIRE Wire
-
 // using a homemade Wire -
 #include "wiring_private.h" // pinPeripheral() function
-
-// this is requiring some ugly changes to core code:
-//  /home/rusty/.arduino15/packages/adafruit/hardware/samd/1.2.3/libraries/Wire/Wire.h
-// remove private section around line 67
-// And here...
-// /home/rusty/.arduino15/packages/adafruit/hardware/samd/1.2.3/cores/arduino/SERCOM.h
-// remove private section around line 215
-
-// not working.
-// #include "async_samd_wire.h"
-// AsyncTwoWire myWire(&sercom1, 11, 13);
-// void SERCOM1_Handler(void) {
-//   myWire.onService();
-// }
-
-#define USE_I2C_DMAC
-
-#ifndef USE_I2C_DMAC
-TwoWire PRESS_WIRE(&sercom1, 11, 13);
-#else
-
-// Try a more grown-up async i2c, using DMA.
-// This runs, passes CRC, but returns bad pressure and temperature
-
 #include "I2C_DMAC.h"
+#define ASYNC_I2C
 
+#define I2C1 I2C
 class MyI2C {
 public:
-  I2C_DMAC I2C1;
-  MyI2C(void) : I2C1(&sercom1,11,13) {
+  // I2C_DMAC I2C1;
+  //MyI2C(void) : I2C1(&sercom1,11,13) {
+  // try it with the standard I2C
+  MyI2C(void) {
     ;
   };
   void begin(void) {
@@ -82,8 +55,8 @@ public:
     I2C1.setWriteChannel(2); // Set the I2C1 DMAC write channel to 2
     I2C1.setReadChannel(3);  // Set the I2C1 DMAC read channel to 3
     // Assign pins 13 & 11 to SERCOM functionality
-    pinPeripheral(11, PIO_SERCOM); // SDA
-    pinPeripheral(13, PIO_SERCOM); // SCL
+    // pinPeripheral(11, PIO_SERCOM); // SDA
+    // pinPeripheral(13, PIO_SERCOM); // SCL
   }
 
   uint8_t _address;
@@ -140,8 +113,6 @@ public:
   }
 };
 MyI2C PRESS_WIRE;
-#define ASYNC_I2C
-#endif // USE_I2C_DMAC
 
 #endif
 
