@@ -1,4 +1,7 @@
 // Pressure sensor globals
+#include "cfg_seaduck.h"
+#ifdef HAS_PRESSURE
+
 #include "pressure.h"
 #include "ms5803.h"
 
@@ -70,3 +73,4 @@ void Pressure::write_data(Print &out){
   write_base16(out,(uint8_t*)&temperature_c100,sizeof(temperature_c100));
 }
 
+#endif // HAS_PRESSURE

@@ -1,3 +1,5 @@
+#include "cfg_seaduck.h"
+
 #ifdef CORE_TEENSY
 #include "i2c_t3_local.h"
 #else
@@ -5,15 +7,9 @@
 #include "i2c_m0_local.h"
 #endif
 
-
 #include "SeaDuck.h"
-#include "pressure.h"
-#include "thermistor.h"
-#include "conductivity.h"
-#include "rtclock.h"
 #include "SdFunctions.h"
 #include "Sensor.h"
-// #include "imu.h"
 
 #ifdef USE_TEENSY_ADC
 ADC *adc=new ADC();
@@ -21,20 +17,29 @@ ADC *adc=new ADC();
 
 IntervalTimer Timer;
 
+#ifdef HAS_PRESSURE
+#include "pressure.h"
 Pressure pressure;
+#endif
 
 #ifdef HAS_CONDUCTIVITY
+#include "conductivity.h"
 Conductivity cond;
 #endif
+
 #ifdef HAS_NTC
+#include "thermistor.h"
 Thermistor ntc;
 #endif
+
 #ifdef HAS_RTCLOCK
+#include "rtclock.h"
 RTClock clock;
 #endif
 
 #ifdef HAS_IMU
-IMU imu;
+#include "imu.h"
+IMU imu0;
 #endif
 
 Storage storage;
@@ -104,7 +109,14 @@ SeaDuck::SeaDuck()
   sample_interval_us=100000; // 10 Hz
 
   num_sensors=0;
+
+#ifdef HAS_IMU
+  sensors[num_sensors++]=&imu0;
+#endif
+
+#ifdef HAS_PRESSURE
   sensors[num_sensors++]=&pressure;
+#endif // HAS_PRESSURE
 #ifdef HAS_CONDUCTIVITY
   sensors[num_sensors++]=&cond;
 #endif
@@ -114,11 +126,6 @@ SeaDuck::SeaDuck()
 #ifdef HAS_RTCLOCK
   sensors[num_sensors++]=&clock;
 #endif
-
-#ifdef HAS_IMU
-  sensors[num_sensors++]=&imu;
-#endif
-
 #ifdef POWER_3V3_ENABLE_PIN
   pinMode(POWER_3V3_ENABLE_PIN,OUTPUT);
   digitalWrite(POWER_3V3_ENABLE_PIN,HIGH);
@@ -137,7 +144,7 @@ void SeaDuck::setup() {
              400000 // rate is 400kHz
              );
 #else
-  AWire.begin();
+  AWire.begin(); 
 #endif
   
   Serial.println("# SeaDuck setup");
@@ -146,18 +153,16 @@ void SeaDuck::setup() {
   common_adc_init();
 #endif
 
-  binary_format=BIN_HEX;
-  
-  storage.init();
-
-  Serial.println("# Storage init");
-  
   for(int i=0;i<num_sensors;i++){
     Serial.print("# ");
     Serial.print(sensors[i]->name);
     sensors[i]->init();
     Serial.println("   done");
   }
+
+  binary_format=BIN_HEX;
+  storage.init();
+  Serial.println("# Storage init");
 
   Serial.println("# Checking for " CMDFILE);
   activate_cmd_file(CMDFILE);

@@ -6,9 +6,7 @@
 #include <SPI.h>
 #include <SdFat.h>
 
-#ifdef CORE_TEENSY
-#include "i2c_t3_local.h"
-#endif
+#include <AWire.h>
 
 #include <TimeLib.h>
 
@@ -21,12 +19,6 @@
 #include "SeaDuck.h"
 #include "ms5803.h"
 
-#ifndef CORE_TEENSY
-// SAMD async I2C
-#include "I2C_DMAC.h"
-#include "DMAC.h"
-#endif
-
 #ifdef HAS_NTC
 #include "thermistor.h"
 #endif
@@ -35,6 +27,7 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BNO055.h>
 #include <utility/imumaths.h>
+#include "imu.h"
 #endif
 
 #include "rtclock.h"

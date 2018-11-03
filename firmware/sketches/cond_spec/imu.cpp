@@ -1,8 +1,10 @@
 // IMU-seaduck interface
-#include "imu.h"
-#ifdef HAS_IMU
+#include "cfg_imu.h"
 
-#include <Wire.h>
+#ifdef HAS_IMU
+#include "imu.h"
+
+// #include <AWire.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BNO055.h>
 #include <utility/imumaths.h>
@@ -19,19 +21,17 @@ void IMU::init(){
       Serial.print("Ooops, no BNO055 detected ... Check your wiring or I2C ADDR!");
       while(1);
     }
-
   delay(1000); // wow - that's a long time.  maybe doesn't have to be so long??
 
   /* Display the current temperature */
   int8_t temp = bno.getTemp();
-  Serial.print("BNO055 Current Temperature: ");
-  Serial.print(temp);
-  Serial.println(" C");
-  Serial.println("");
+  // Serial.print("# BNO055 Current Temperature: ");
+  // Serial.print(temp);
+  // Serial.println(" C");
 
   bno.setExtCrystalUse(true);
 
-  Serial.println("BNO055 Calibration status values: 0=uncalibrated, 3=fully calibrated");
+  // Serial.println("# BNO055 Calibration status values: 0=uncalibrated, 3=fully calibrated");
 }
 
 void IMU::async_read() {
@@ -103,14 +103,14 @@ void IMU::write_frame_info(Print &out) {
              "('cal_system','<u1'),('cal_gyro','<u1'),('cal_accel','<u1'),('cal_mag','<u1')" );
 }
 
-struct {
+typedef struct {
   double euler_x, euler_y, euler_z;
   double accel_x, accel_y, accel_z;
   uint8_t cal_system, cal_gyro, cal_accel, cal_mag;
 } full_record;
 
 void IMU::write_data(Print &out){
-  struct full_record rec;
+  full_record rec;
   rec.euler_x=euler.x();
   rec.euler_y=euler.y();
   rec.euler_z=euler.z();

@@ -6,7 +6,6 @@
 // picks up library directories based on includes like this,
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BNO055.h>
-
 #include <utility/imumaths.h>
 
 class IMU : public Sensor {

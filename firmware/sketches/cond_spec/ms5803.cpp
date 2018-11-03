@@ -27,6 +27,9 @@ local pub, and you've found our code helpful, please buy us a round!
 
 Distributed as-is; no warranty is given.
 ******************************************************************************/
+#include "cfg_seaduck.h"
+#ifdef HAS_PRESSURE
+
 #include <Arduino.h>
 
 #pragma GCC optimize ("O0")
@@ -453,3 +456,4 @@ void MS5803::sensorWait(uint8_t time)
   delay(time);
 }
 
+#endif // HAS_PRESSURE
