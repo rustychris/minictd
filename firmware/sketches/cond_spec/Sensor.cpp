@@ -3,8 +3,7 @@
 
 #pragma GCC optimize ("O0")
 
-IntervalTimer sensorTimer;
-
+IntervalTimer sensorTimer(4);
 
 void Sensor::read() {
   push_busy();

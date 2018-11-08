@@ -10,7 +10,7 @@
 ADC *adc=new ADC();
 #endif
 
-IntervalTimer Timer;
+IntervalTimer Timer(3);
 
 #ifdef HAS_PRESSURE
 #include "pressure.h"
@@ -153,6 +153,10 @@ void SeaDuck::setup() {
   common_adc_init();
 #endif
 
+#ifdef STATUS_LED
+  pinMode(STATUS_LED,OUTPUT); // green led
+#endif
+
   for(int i=0;i<num_sensors;i++){
     Serial.print("# ");
     Serial.print(sensors[i]->name);
@@ -279,7 +283,10 @@ void SeaDuck::continuous_sample(void) {
 
   // This is just for testing anyway -- loop for a limited amount
   // of time.
-  while ( millis()-t_start < 2000 ) {
+  while ( millis()-t_start < 60000 ) {
+#ifdef STATUS_LED
+    digitalWrite(STATUS_LED,HIGH);
+#endif
     storage.loop();
 
     // Allow stopping the loop on ! or ESC
@@ -294,6 +301,10 @@ void SeaDuck::continuous_sample(void) {
   Timer.end();
   while( stack_size() ) ; // let any currently running sampling code finish
   storage.loop();
-  
+
+#ifdef STATUS_LED
+  digitalWrite(STATUS_LED,LOW);
+#endif
+
   Serial.println("# Exiting interval timer loop. ");
 }

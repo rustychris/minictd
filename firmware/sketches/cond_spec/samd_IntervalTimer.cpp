@@ -1,9 +1,21 @@
 #include "samd_IntervalTimer.h"
 
+// statically track how many timers are created
+static volatile int samd_timer_count=0;
+
 //define the interrupt handlers
 // these must match whatever is in the constructor
+void TC3_Handler(){
+  Adafruit_ZeroTimer::timerHandler(3);
+}
 void TC4_Handler(){
   Adafruit_ZeroTimer::timerHandler(4);
+}
+
+SAMD_IntervalTimer::SAMD_IntervalTimer(uint8_t tn)
+  : Adafruit_ZeroTimer(tn) {
+  samd_timer_count++;
+  // can't print stuff here.
 }
 
 // trim it down to the most direct signature

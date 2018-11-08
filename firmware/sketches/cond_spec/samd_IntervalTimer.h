@@ -16,7 +16,7 @@ class SAMD_IntervalTimer : public Adafruit_ZeroTimer
 
   void end(void);
 
-  SAMD_IntervalTimer() : Adafruit_ZeroTimer(4) {;};
+  SAMD_IntervalTimer(uint8_t tn);
 
   ~SAMD_IntervalTimer() {
 		end();

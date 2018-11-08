@@ -14,6 +14,8 @@
 
 #include "cfg_storage.h"
 
+#define STATUS_LED 8
+
 #define STREAM_START_LINE "$"
 #define MONITOR_START_LINE "#"
 

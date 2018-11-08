@@ -47,8 +47,6 @@ void RTC_DS3231::async_read3(void) {
   DateTime dt(y, m, d, hh, mm, ss);
   reading_seconds=dt.unixtime();
 
-  Serial.print("y="); Serial.println(y);
-
   pop_fn_and_call();
 }
 

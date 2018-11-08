@@ -17,7 +17,8 @@ class IMU : public Sensor {
   virtual void init();
   virtual void async_read();
   void display();
-  
+  void display_cal(void);
+
   virtual bool dispatch_command(const char *cmd, const char *cmd_arg);
   virtual void help();
   virtual void write_frame_info(Print &out);

@@ -311,8 +311,9 @@ void MS5803::async_conversion(uint8_t flags)
   // up, so this should be a timed interrupt call instead of async i2c.
   uint32_t delay_ms=millis_for_flags(flags);
   // Serial.println("About to start timer");
-    
-  if ( ! sensorTimer.begin(end_delay_and_pop,1000*(100+delay_ms)) ) {
+
+  // this had been 100ms extra.  how about just 10ms extra?
+  if ( ! sensorTimer.begin(end_delay_and_pop,1000*(10+delay_ms)) ) {
     Serial.println("No timers available!");
   }
   
