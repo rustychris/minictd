@@ -1,6 +1,8 @@
 #ifndef RTCLOCK_H
 #define RTCLOCK_H
 
+#ifdef RTC_TEENSY
+
 #include "Sensor.h"
 
 class RTClock : public Sensor {
@@ -25,4 +27,5 @@ public:
   void watch();
 };
 
+#endif // RTC_TEENSY
 #endif // RTCLOCK_H

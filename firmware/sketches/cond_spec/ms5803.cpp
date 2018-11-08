@@ -34,13 +34,7 @@ Distributed as-is; no warranty is given.
 
 #pragma GCC optimize ("O0")
 
-#ifdef CORE_TEENSY
-#include "i2c_t3_local.h" // Wire library is used for I2C
-#define ASYNC_I2C
-#else
-#include "i2c_m0_local.h"
-#define ASYNC_I2C
-#endif
+#include <AWire.h>
 
 #define PRESS_WIRE AWire
 

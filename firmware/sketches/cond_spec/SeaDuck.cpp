@@ -1,11 +1,6 @@
 #include "cfg_seaduck.h"
 
-#ifdef CORE_TEENSY
-#include "i2c_t3_local.h"
-#else
-// #include <Wire.h>
-#include "i2c_m0_local.h"
-#endif
+#include <AWire.h>
 
 #include "SeaDuck.h"
 #include "SdFunctions.h"
@@ -32,9 +27,9 @@ Conductivity cond;
 Thermistor ntc;
 #endif
 
-#ifdef HAS_RTCLOCK
-#include "rtclock.h"
-RTClock clock;
+#ifdef HAS_RTC_DS3231
+#include "rtc_ds3231.h"
+RTC_DS3231 clock;
 #endif
 
 #ifdef HAS_IMU
@@ -126,6 +121,11 @@ SeaDuck::SeaDuck()
 #ifdef HAS_RTCLOCK
   sensors[num_sensors++]=&clock;
 #endif
+
+#ifdef HAS_RTC_DS3231
+  sensors[num_sensors++]=&clock;
+#endif
+
 #ifdef POWER_3V3_ENABLE_PIN
   pinMode(POWER_3V3_ENABLE_PIN,OUTPUT);
   digitalWrite(POWER_3V3_ENABLE_PIN,HIGH);

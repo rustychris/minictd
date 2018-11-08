@@ -2,9 +2,10 @@
 #include "cfg_imu.h"
 
 #ifdef HAS_IMU
+#include <AWire.h>
 #include "imu.h"
+// #define Wire AWire // this is done in my Adafruit_BNO055.h
 
-// #include <AWire.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BNO055.h>
 #include <utility/imumaths.h>
@@ -38,6 +39,7 @@ void IMU::async_read() {
   // calling convention for async_read is that the callback stack should be
   // popped after the read is complete.
 
+#ifndef ASYNC_I2C
   euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);
   accel = bno.getVector(Adafruit_BNO055::VECTOR_LINEARACCEL);
 
@@ -45,6 +47,87 @@ void IMU::async_read() {
   // accel.x(), .y(), .z()
 
   bno.getCalibration(&cal_system, &cal_gyro, &cal_accel, &cal_mag);
+  pop_fn_and_call();
+#else
+  push_fn(this,(SensorFn)&IMU::async_readEuler);
+  push_fn(this,(SensorFn)&IMU::async_readAccel);
+  pop_fn_and_call();
+#endif
+}
+
+// Status: seems to read the first euler angle okay, but the other
+// angles are crap, and acceleration is all zero.
+
+void IMU::async_readEuler(void) {
+  // euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);
+  Serial.println("async_readEuler");
+  push_fn(this, (SensorFn)&IMU::async_readEuler2);
+  async_getVector(Adafruit_BNO055::VECTOR_EULER);
+}
+
+void IMU::async_readEuler2(void) {
+  //case VECTOR_EULER:
+  /* 1 degree = 16 LSB */
+  Serial.println("async_readEuler2");
+  for(int i=0;i<3;i++)
+    euler[i]=0.0625*target[i];// 1/16.
+  pop_fn_and_call();
+}
+
+void IMU::async_readAccel(void) {
+  Serial.println("async_readAccel");
+  push_fn(this, (SensorFn)&IMU::async_readAccel2);
+  async_getVector(Adafruit_BNO055::VECTOR_LINEARACCEL);
+}
+
+void IMU::async_readAccel2(void) {
+  // case VECTOR_ACCELEROMETER:
+  // case VECTOR_LINEARACCEL:
+  // case VECTOR_GRAVITY:
+  /* 1m/s^2 = 100 LSB */
+  Serial.println("async_readAccel2");
+  Serial.print("accel[0] ");
+  Serial.println(accel[0]);
+  for(int i=0;i<3;i++)
+    accel[i]=0.01*target[i];// 1/100
+
+  pop_fn_and_call();
+}
+
+
+void IMU::async_getVector(Adafruit_BNO055::adafruit_vector_type_t vector_type) {
+  // readLen((adafruit_bno055_reg_t)vector_type, buffer, 6);
+  AWire.beginTransmission(bno._address);
+  AWire.write((uint8_t)vector_type);
+  push_fn(this,(SensorFn)&IMU::async_readVector1);
+  AWire.onTransmitDone(pop_fn_and_call);
+  AWire.sendTransmission();
+}
+
+void IMU::async_readVector1(void) {
+  AWire.onTransmitDone(NULL);
+  push_fn(this,(SensorFn)&IMU::async_readVector2);
+  AWire.onReqFromDone(pop_fn_and_call); // I think this is what is not getting called.
+  // 2 bytes per each of 3 components:
+  AWire.sendRequest(bno._address, 6);
+}
+
+void IMU::async_readVector2(void) {
+  // 2 bytes per each of 3 components:
+  AWire.onReqFromDone(NULL);
+  Serial.println("hit readVector2");
+  uint8_t lsb,msb;
+  int16_t combined;
+  for (uint8_t i = 0; i < 3; i++) {
+    lsb = AWire.read();
+    msb = AWire.read();
+    combined=( ((int16_t)lsb) | (((int16_t)msb) << 8) );
+    Serial.print("  combined: ");
+    Serial.println(combined);
+    target[i] = combined ;
+    Serial.print("  in target: ");
+    Serial.println(target[i]);
+  }
   pop_fn_and_call();
 }
 

@@ -30,7 +30,10 @@
 #include "imu.h"
 #endif
 
-#include "rtclock.h"
+#ifdef HAS_RTC_DS3231
+#include "rtc_ds3231.h"
+#endif
+
 #include "SdFunctions.h"
 
 SeaDuck logger;

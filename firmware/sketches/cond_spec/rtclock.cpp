@@ -1,26 +1,20 @@
+#include "cfg_seaduck.h"
+#ifdef HAS_RTC_TEENSY
+
 #include <TimeLib.h>
 
 #include "SeaDuck.h"
 #include "rtclock.h"
 
-#ifdef RTC_TEENSY
-# include <core_pins.h> // needed for Teensy3Clock
-#endif // RTC_TEENSY
+#include <core_pins.h> // needed for Teensy3Clock
 
 void RTClock::init() {
   ;
 }
 
 void RTClock::async_read() {
-#ifdef RTC_TEENSY
   reading_seconds = Teensy3Clock.get();
   reading_partial = RTC_TPR;
-#else
-  // Eventually replace with DS1307 call
-#warning "FIX FOR DS1307"
-  reading_seconds = now();
-  reading_partial = 0;
-#endif
   pop_fn_and_call();
 }
 
@@ -85,3 +79,5 @@ void RTClock::write_data(Print &out) {
   write_base16(out,(uint8_t*)(&reading_seconds),sizeof(reading_seconds));
   write_base16(out,(uint8_t*)(&reading_partial),sizeof(reading_partial));
 }
+
+#endif // HAS_RTC_TEENSY

@@ -5,9 +5,9 @@
 // #include "cfg_cond.h"
 // #include "cfg_ntc.h"
 
-#include "cfg_rtc.h" // clock source configured within
 #include "cfg_imu.h"
 #include "cfg_pressure.h"
+#include "cfg_rtc_ds3231.h"
 
 // if defined, a digital output tied to the enable pin of the LDO
 // #define POWER_3V3_ENABLE_PIN 3
