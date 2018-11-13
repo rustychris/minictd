@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <SdFat.h>
+#include <elapsedMillis.h>
 
 #include "Shell.h"
 
@@ -9,7 +10,12 @@ void Shell::setup(void) {
   request_mode = MODE_COMMAND;
 
   Serial.begin(115200);
-  while( !Serial ) ;
+  elapsedMillis elapsed;
+  // for debugging, it's nice to see the start
+  // of everything, so wait a few seconds.
+  // then plow ahead so we can also be functional
+  // headless.
+  while( (!Serial) && (elapsed<3000) );
 
   // Any chance this causes heartache?
   // pinMode(LED_BUILTIN,OUTPUT);
