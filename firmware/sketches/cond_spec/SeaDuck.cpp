@@ -37,6 +37,11 @@ RTC_DS3231 clock;
 IMU imu0;
 #endif
 
+#ifdef HAS_GPS
+#include "gps.h"
+GPS gps;
+#endif
+
 Storage storage;
 
 #ifdef USE_TEENSY_ADC
@@ -124,6 +129,10 @@ SeaDuck::SeaDuck()
 
 #ifdef HAS_RTC_DS3231
   sensors[num_sensors++]=&clock;
+#endif
+
+#ifdef HAS_GPS
+  sensors[num_sensors++]=&gps;
 #endif
 
 #ifdef POWER_3V3_ENABLE_PIN

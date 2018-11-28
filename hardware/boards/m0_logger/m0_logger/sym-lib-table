@@ -1,0 +1,5 @@
+(sym_lib_table
+  (lib (name m0_logger)(type Legacy)(uri /home/rusty/src/minictd/hardware/boards/m0_logger/m0_logger/m0_logger.lib)(options "")(descr ""))
+  (lib (name logger_parts)(type Legacy)(uri /home/rusty/src/minictd/hardware/boards/logger/logger_parts.lib)(options "")(descr ""))
+  (lib (name sensor_head-cache)(type Legacy)(uri /home/rusty/src/minictd/hardware/boards/sensor_head/sensor_head-cache.lib)(options "")(descr ""))
+)

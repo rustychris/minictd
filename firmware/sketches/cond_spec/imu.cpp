@@ -1,5 +1,5 @@
 // IMU-seaduck interface
-#include "cfg_imu.h"
+#include "cfg_seaduck.h"
 
 #ifdef HAS_IMU
 #include <AWire.h>
