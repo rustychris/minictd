@@ -855,7 +855,7 @@
   )
 
   (module Connector_PinHeader_2.54mm:PinHeader_2x02_P2.54mm_Horizontal (layer F.Cu) (tedit 59FED5CB) (tstamp 5C2781D0)
-    (at 139.7 56.515 270)
+    (at 139.7 55.372 270)
     (descr "Through hole angled pin header, 2x02, 2.54mm pitch, 6mm pin length, double rows")
     (tags "Through hole angled pin header THT 2x02 2.54mm double row")
     (path /5BFB04EB)
@@ -996,8 +996,8 @@
     )
   )
 
-  (module Connector_PinHeader_2.54mm:PinHeader_2x02_P2.54mm_Horizontal (layer F.Cu) (tedit 59FED5CB) (tstamp 5C278ACA)
-    (at 133.35 56.515 270)
+  (module Connector_PinHeader_2.54mm:PinHeader_2x02_P2.54mm_Horizontal (layer F.Cu) (tedit 59FED5CB) (tstamp 5C3A8A71)
+    (at 132.588 55.372 270)
     (descr "Through hole angled pin header, 2x02, 2.54mm pitch, 6mm pin length, double rows")
     (tags "Through hole angled pin header THT 2x02 2.54mm double row")
     (path /5BFB041F)
@@ -1099,9 +1099,14 @@
     (fp_line (start 74.8 -9.85) (end -2.8 -9.85) (layer B.Fab) (width 0.15))
     (fp_line (start -2.8 -9.85) (end -2.8 9.85) (layer B.Fab) (width 0.15))
     (model "/home/rusty/src/minictd/hardware/parts/Battery Samsung ICR 18650 -22E.step"
-      (offset (xyz -0.5 9.5 17))
+      (offset (xyz -0.5 8.75 17))
       (scale (xyz 1.05 1 1))
       (rotate (xyz 0 0 0))
+    )
+    (model /home/rusty/src/minictd/hardware/housings/pvc-1.25inch.wrl
+      (offset (xyz 0 -0.75 2.3))
+      (scale (xyz 0.394 0.394 0.394))
+      (rotate (xyz 0 -90 0))
     )
   )
 

@@ -373,6 +373,11 @@
       (scale (xyz 1 1 1))
       (rotate (xyz 0 0 0))
     )
+    (model "/home/rusty/src/minictd/hardware/parts/Micro SD Card.STEP"
+      (offset (xyz -24.3 -18.9 0.7))
+      (scale (xyz 1 1 1))
+      (rotate (xyz 0 0 0))
+    )
   )
 
   (module m0_logger_footprints:afBNO055 (layer F.Cu) (tedit 5BFB5442) (tstamp 5C1D8877)
