@@ -1,0 +1,14 @@
+(module tab_drills (layer F.Cu) (tedit 5BFEF4C7)
+  (fp_text reference REF** (at -2.54 0.254) (layer F.SilkS) hide
+    (effects (font (size 1 1) (thickness 0.15)))
+  )
+  (fp_text value tab_drills (at 0.254 -1.27) (layer F.Fab) hide
+    (effects (font (size 1 1) (thickness 0.15)))
+  )
+  (pad "" np_thru_hole circle (at 2.286 0.254) (size 0.508 0.508) (drill 0.508) (layers *.Cu *.Mask))
+  (pad "" np_thru_hole circle (at 1.27 0.254) (size 0.508 0.508) (drill 0.508) (layers *.Cu *.Mask))
+  (pad "" np_thru_hole circle (at 0.254 0.254) (size 0.508 0.508) (drill 0.508) (layers *.Cu *.Mask))
+  (pad "" np_thru_hole circle (at 0.254 2.286) (size 0.508 0.508) (drill 0.508) (layers *.Cu *.Mask))
+  (pad "" np_thru_hole circle (at 1.27 2.286) (size 0.508 0.508) (drill 0.508) (layers *.Cu *.Mask))
+  (pad "" np_thru_hole circle (at 2.286 2.286) (size 0.508 0.508) (drill 0.508) (layers *.Cu *.Mask))
+)
