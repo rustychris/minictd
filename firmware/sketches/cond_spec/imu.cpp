@@ -12,6 +12,7 @@
 
 Adafruit_BNO055 bno = Adafruit_BNO055();
 
+
 /* large parts of this taken from the rawdata.ino example from adafruit */
 
 void IMU::init(){

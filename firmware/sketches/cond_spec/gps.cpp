@@ -26,6 +26,7 @@ void Serial1_callback() {
 
 void GPS::init(void){
   Serial1.begin(9600);
+  Serial.println("initialized Serial1");
   serial1_gps=this;
 }
 
