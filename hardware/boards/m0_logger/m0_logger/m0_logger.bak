@@ -875,4 +875,12 @@ Wire Wire Line
 Wire Wire Line
 	6900 1000 7100 1000
 NoConn ~ 7000 900 
+Text Label 6850 5250 0    50   ~ 0
+AO1
+Text Label 6850 5350 0    50   ~ 0
+AO2
+Text Label 6850 5450 0    50   ~ 0
+BO1
+Text Label 6850 5550 0    50   ~ 0
+BO2
 $EndSCHEMATC

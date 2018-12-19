@@ -570,7 +570,6 @@ NoConn ~ 5400 2450
 NoConn ~ 5400 2350
 NoConn ~ 5400 2250
 NoConn ~ 5400 2150
-NoConn ~ 5400 2050
 NoConn ~ 5400 1950
 Wire Wire Line
 	8500 1800 8000 1800
@@ -736,10 +735,8 @@ Text Label 6450 2050 0    50   ~ 0
 BIN1
 Wire Wire Line
 	6450 2050 6400 2050
-Text Label 6050 3200 2    50   ~ 0
+Text Label 5200 2050 2    50   ~ 0
 BIN2
-Wire Wire Line
-	6050 3200 6050 3050
 Text Label 4900 2850 0    50   ~ 0
 DRV_nSLEEP
 Wire Wire Line
@@ -883,4 +880,7 @@ Text Label 6850 5450 0    50   ~ 0
 BO1
 Text Label 6850 5550 0    50   ~ 0
 BO2
+Wire Wire Line
+	5200 2050 5400 2050
+NoConn ~ 6050 3050
 $EndSCHEMATC
