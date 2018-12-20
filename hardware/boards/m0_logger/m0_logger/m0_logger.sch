@@ -567,8 +567,6 @@ NoConn ~ 6400 2350
 NoConn ~ 6400 1950
 NoConn ~ 6400 1850
 NoConn ~ 5400 2450
-NoConn ~ 5400 2350
-NoConn ~ 5400 2250
 NoConn ~ 5400 2150
 NoConn ~ 5400 1950
 Wire Wire Line
@@ -691,7 +689,7 @@ L Device:C_Small C5
 U 1 1 5C19F487
 P 5350 4700
 F 0 "C5" H 5250 4800 50  0000 L CNN
-F 1 "0.1uF" H 5200 4600 50  0000 L CNN
+F 1 "0.1uF" H 5350 4600 50  0000 L CNN
 F 2 "Capacitor_SMD:C_0805_2012Metric_Pad1.15x1.40mm_HandSolder" H 5350 4700 50  0001 C CNN
 F 3 "~" H 5350 4700 50  0001 C CNN
 F 4 "16V, X7R" H 5350 4700 50  0001 C CNN "Notes"
@@ -795,9 +793,9 @@ Wire Wire Line
 	4850 4950 4850 5050
 Connection ~ 4850 5050
 Wire Wire Line
-	5250 4950 5600 4950
+	5250 4950 5300 4950
 Wire Wire Line
-	5600 5050 5250 5050
+	5600 5050 5300 5050
 $Comp
 L Connector_Generic:Conn_01x02 J6
 U 1 1 5C1F8D63
@@ -883,4 +881,30 @@ BO2
 Wire Wire Line
 	5200 2050 5400 2050
 NoConn ~ 6050 3050
+Text Label 5100 2250 0    50   ~ 0
+ASEN
+Text Label 5100 2350 0    50   ~ 0
+BSEN
+Wire Wire Line
+	5100 2250 5400 2250
+Wire Wire Line
+	5400 2350 5100 2350
+Text Label 4650 4750 0    50   ~ 0
+ASEN
+Text Label 4650 5550 0    50   ~ 0
+BSEN
+Wire Wire Line
+	5300 4750 5300 4950
+Connection ~ 5300 4950
+Wire Wire Line
+	5300 4950 5600 4950
+Wire Wire Line
+	5300 5050 5300 5550
+Wire Wire Line
+	5300 5550 4650 5550
+Connection ~ 5300 5050
+Wire Wire Line
+	5300 5050 5250 5050
+Wire Wire Line
+	5300 4750 4650 4750
 $EndSCHEMATC
