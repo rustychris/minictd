@@ -34,6 +34,10 @@
 #include "rtc_ds3231.h"
 #endif
 
+#ifdef HAS_MOTOR
+#include "motor.h"
+#endif
+
 #include "SdFunctions.h"
 
 SeaDuck logger;

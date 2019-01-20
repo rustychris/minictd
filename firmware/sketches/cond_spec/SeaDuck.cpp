@@ -42,6 +42,11 @@ IMU imu0;
 GPS gps;
 #endif
 
+#ifdef HAS_MOTOR
+#include "motor.h"
+Motor motor;
+#endif
+
 Storage storage;
 
 #ifdef USE_TEENSY_ADC
@@ -133,6 +138,10 @@ SeaDuck::SeaDuck()
 
 #ifdef HAS_GPS
   sensors[num_sensors++]=&gps;
+#endif
+
+#ifdef HAS_MOTOR
+  sensors[num_sensors++]=&motor;
 #endif
 
 #ifdef POWER_3V3_ENABLE_PIN
