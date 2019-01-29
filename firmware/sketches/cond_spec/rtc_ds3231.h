@@ -26,6 +26,7 @@ public:
 
   void status(void);
   void watch(void);
+  void set_datetime(const char *str);
 };
 
 #endif // HAS_RTC_DS3231

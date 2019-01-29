@@ -47,6 +47,11 @@ GPS gps;
 Motor motor;
 #endif
 
+#ifdef DOTSTAR_CLK
+#include <Adafruit_DotStar.h>
+Adafruit_DotStar dotstar = Adafruit_DotStar(1,DOTSTAR_DATA,DOTSTAR_CLK);  
+#endif
+
 Storage storage;
 
 #ifdef USE_TEENSY_ADC
@@ -186,6 +191,11 @@ void SeaDuck::setup() {
   storage.init();
   Serial.println("# Storage init");
 
+#ifdef DOTSTAR_CLK
+  dotstar.begin();
+  dotstar.show();// turns off?
+#endif
+  
   Serial.println("# Checking for " CMDFILE);
   activate_cmd_file(CMDFILE);
 }
@@ -299,9 +309,11 @@ void SeaDuck::continuous_sample(void) {
   Serial.println("# Starting interval timer loop");
   Timer.begin(timer_isr,sample_interval_us);
 
-  // This is just for testing anyway -- loop for a limited amount
-  // of time.
-  while ( millis()-t_start < 60000 ) {
+  // for testing -- loop for a limited amount
+  // of time:
+  // while ( millis()-t_start < 60000 ) {
+  // real deal - loop indefinitely
+  while ( 1 ) {
 #ifdef STATUS_LED
     digitalWrite(STATUS_LED,HIGH);
 #endif

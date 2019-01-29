@@ -5,10 +5,10 @@
 // #include "cfg_cond.h"
 // #include "cfg_ntc.h"
 
-// #include "cfg_imu.h"
+#include "cfg_imu.h"
 #include "cfg_pressure.h"
 #include "cfg_rtc_ds3231.h"
-// #include "cfg_gps.h"
+#include "cfg_gps.h"
 #include "cfg_motor.h"
 
 
@@ -17,7 +17,13 @@
 
 #include "cfg_storage.h"
 
-#define STATUS_LED 8
+// for itsy m0 express
+#define STATUS_LED 13
+
+// specific to itsy m0 express
+// other boards omit these
+#define DOTSTAR_CLK 40
+#define DOTSTAR_DATA 41
 
 #define STREAM_START_LINE "$"
 #define MONITOR_START_LINE "#"

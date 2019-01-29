@@ -13,7 +13,10 @@ void Motor::init() {
   
   pinMode(MOTOR_ASENSE,INPUT);
   pinMode(MOTOR_BSENSE,INPUT);
-  
+
+  // Sensor will default to enabled=True, but
+  // for the motor safer to disable, require
+  // user to enable.
   disable();
 
   a_sense_offset=analogRead(MOTOR_ASENSE);
@@ -38,38 +41,80 @@ void Motor::all_off(void){
   digitalWrite(MOTOR_B2,0);
 }
 
-void Motor::async_read() { }
+void Motor::async_read() {
+  // no work for motor yet, but we still have to play nice
+  // and keep the ball in the air.
+  pop_fn_and_call();
+}
 
-void Motor::display() {
+void Motor::display(unsigned int select) {
   int a_sense=analogRead(MOTOR_ASENSE) - a_sense_offset;
   int b_sense=analogRead(MOTOR_BSENSE) - b_sense_offset;
 
-  Serial.print("motor_enable="); Serial.println( enabled );
+  if( select & DISP_ENABLE ) {
+    Serial.print("motor_enable="); Serial.println( enabled );
+  }
   
-  Serial.print("motor_a_sense="); Serial.println(a_sense);
-  Serial.print("motor_b_sense="); Serial.println(b_sense);
-  // this comes in as counts, and defaults to 10 bits over
-  // the 0..3.3V range.
-  
-  Serial.print("motor_a_current="); Serial.println(a_sense*3.3/4096.0/MOTOR_ASENSE_R,3);
-  Serial.print("motor_b_current="); Serial.println(b_sense*3.3/4096.0/MOTOR_BSENSE_R,3);
+  if(select & DISP_SENSE ) {
+    Serial.print("motor_a_sense="); Serial.println(a_sense);
+    Serial.print("motor_b_sense="); Serial.println(b_sense);
+    // this comes in as counts, and defaults to 10 bits over
+    // the 0..3.3V range.
+  }
+
+  if(select&DISP_CURRENT) {
+    Serial.print("motor_a_current="); Serial.println(a_sense*3.3/4096.0/MOTOR_ASENSE_R,3);
+    Serial.print("motor_b_current="); Serial.println(b_sense*3.3/4096.0/MOTOR_BSENSE_R,3);
+  }
+}
+
+void Motor::wait_and_stop() {
+  // flush input buffer, then stop on any input
+  while(Serial.available() ) { Serial.read(); }
+
+  while(1) {
+    if( Serial.available() ) {
+      uint8_t c=Serial.read();
+      all_off();
+      break;
+    } else {
+      display(DISP_CURRENT);
+      delay(40);
+    }
+  }
 }
 
 bool Motor::dispatch_command(const char *cmd, const char *cmd_arg) {
   if ( !strcmp(cmd,"motor") ) {
     display();
   } else if(!strcmp(cmd,"motor_a_fwd")) {
-    digitalWrite(MOTOR_A1,1);
-    digitalWrite(MOTOR_A2,0);
+    if ( !enabled ){ Serial.println("Motor is not enabled"); }
+    else {
+      digitalWrite(MOTOR_A1,1);
+      digitalWrite(MOTOR_A2,0);
+      wait_and_stop();
+    }
   } else if(!strcmp(cmd,"motor_a_rev")) {
-    digitalWrite(MOTOR_A1,0);
-    digitalWrite(MOTOR_A2,1);
+    if ( !enabled ){ Serial.println("Motor is not enabled"); }
+    else {
+      digitalWrite(MOTOR_A1,0);
+      digitalWrite(MOTOR_A2,1);
+      wait_and_stop();
+    }
   } else if(!strcmp(cmd,"motor_b_fwd")) {
-    digitalWrite(MOTOR_B1,1);
-    digitalWrite(MOTOR_B2,0);
+    if ( !enabled ){ Serial.println("Motor is not enabled"); }
+    else {
+      digitalWrite(MOTOR_B1,1);
+      digitalWrite(MOTOR_B2,0);
+      wait_and_stop();
+    }
   } else if(!strcmp(cmd,"motor_b_rev")) {
-    digitalWrite(MOTOR_B1,0);
-    digitalWrite(MOTOR_B2,1);
+    if ( !enabled ) { Serial.println("Motor is not enabled"); }
+    else {
+      digitalWrite(MOTOR_B1,0);
+      digitalWrite(MOTOR_B2,1);
+      wait_and_stop();
+    }
   } else if(!strcmp(cmd,"motor_off")) {
     all_off();
   } else if(!strcmp(cmd,"motor_enable")) {

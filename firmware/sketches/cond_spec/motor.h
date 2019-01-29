@@ -2,14 +2,24 @@
 #define MOTOR_H
 #include "Sensor.h"
 
+enum { 
+  DISP_ENABLE=1,
+  DISP_SENSE=2,
+  DISP_CURRENT=4,
+  DISP_ALL=7
+};
+
+
 class Motor : public Sensor {
 public:
   Motor() {
     strcpy(name,"motor");
+    enabled=false;
   }
   virtual void init();
   virtual void async_read();
-  void display();
+  void display(void) { display(DISP_ALL); }
+  void display(unsigned int select);
 
   virtual bool dispatch_command(const char *cmd, const char *cmd_arg);
   virtual void help();
@@ -19,7 +29,8 @@ public:
   void all_off(void);
   void disable(void);
   void enable(void);
-
+  void wait_and_stop(void);
+  
 private:
   // if true, the motor driver is on.
   // if false, motor driver is disabled, and no drive signals

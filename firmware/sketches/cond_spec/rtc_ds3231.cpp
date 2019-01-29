@@ -12,6 +12,7 @@
 #include "DS3231.h"
 
 void print_date(DateTime &dt);
+static byte conv_digits(const char* p,int digits);
 
 DS3231 ds3231;
 
@@ -50,9 +51,45 @@ void RTC_DS3231::async_read3(void) {
   pop_fn_and_call();
 }
 
+
+// stolen from RTClib.cpp
+static byte conv_digits(const char* p,int digits)
+{
+  uint16_t v = 0;
+  for(int digit=0;digit<digits;digit++) {
+    v*=10;
+    if ('0' <= *p && *p <= '9') 
+      v += *p - '0';
+    p++;
+  }
+  return v;
+}
+
+void RTC_DS3231::set_datetime(const char *str) {
+  // format is YYYY-MM-DDTHH:MM:SS
+  // where the date/time separator is arbitrary (T, space, _, etc.)
+  if( strlen(str) != strlen("YYYY-MM-DD HH:MM:SS") ) {
+    Serial.println("Error: format is YYYY-MM-DD HH:MM:SS");
+    return;
+  }
+
+  ds3231.setYear(conv_digits(str+2,2)); // two digit year
+  ds3231.setMonth(conv_digits(str+5,2));
+  ds3231.setDate(conv_digits(str+8,2));
+  ds3231.setHour(conv_digits(str+11,2));
+  ds3231.setMinute(conv_digits(str+14,2));
+  ds3231.setSecond(conv_digits(str+17,2));
+}
+
 bool RTC_DS3231::dispatch_command(const char *cmd, const char *cmd_arg) {
   if ( strcmp(cmd,"rtc_status")==0 ) {
     status();
+  } else if ( strcmp(cmd,"rtc_datetime")==0 ) {
+    if(cmd_arg) {
+      set_datetime(cmd_arg);
+    } else {
+      status();
+    }
   } else if ( strcmp(cmd,"rtc_watch")==0 ) {
     watch();
   } else if ( strcmp(cmd,"rtc_enable")==0 ) {
@@ -71,6 +108,7 @@ void RTC_DS3231::help(void) {
   Serial.println("  Real time clock");
   Serial.println("    rtc_status       # print current time in seconds");
   Serial.println("    rtc_watch        # check incrementing of RTC");
+  Serial.println("    rtc_datetime=YYYY-MM-DD HH:MM:SS # set clock");
   Serial.println("    rtc_enable[=0,1] # enable/disable ");
   
 }

@@ -96,6 +96,12 @@ void GPS::record_byte(char c) {
 bool GPS::dispatch_command(const char *cmd, const char *cmd_arg) {
   if( !strcmp(cmd,"gps_watch") ) {
     watch();
+  } else if(!strcmp(cmd,"gps_enable")) {
+    if(cmd_arg) {
+      enabled=(bool)atoi(cmd_arg);
+    } else {
+      Serial.print("gps_enable="); Serial.println( enabled );
+    }
   } else {
     return false;
   }
@@ -104,7 +110,6 @@ bool GPS::dispatch_command(const char *cmd, const char *cmd_arg) {
 
 void GPS::help(void) {
   Serial.println("  GPS");
-  Serial.println("    gps              # report gps status");
   Serial.println("    gps_watch        # stream GPS serial data");
   Serial.println("    gps_enable[=0,1] # enable/disable logging of gps");
 }

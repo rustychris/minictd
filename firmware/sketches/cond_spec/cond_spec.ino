@@ -38,6 +38,10 @@
 #include "motor.h"
 #endif
 
+#ifdef DOTSTAR_CLK
+#include <Adafruit_DotStar.h>
+#endif
+
 #include "SdFunctions.h"
 
 SeaDuck logger;
