@@ -1,6 +1,7 @@
 #include "cfg_seaduck.h"
 
 #include <AWire.h>
+#include <elapsedMillis.h>
 
 #include "SeaDuck.h"
 #include "SdFunctions.h"
@@ -233,18 +234,32 @@ void SeaDuck::help() {
 }
 
 time_t SeaDuck::unixtime() {
+#ifdef HAS_RTC_DS3231
   clock.read();
   return clock.reading_seconds;
+#else
+  // Punt with time since startup.  Maybe at some point
+  // can get a GPS based time in the absence of RTC.
+  return (time_t)(millis()/1000);
+#endif
 }
 
+// HERE - this needs to be routed to SD when available.
 void SeaDuck::write_header(void) {
-  Serial.print("[");
+  Print *out=&Serial;
+  
+  if( storage.status==Storage::ENABLED ) {
+    out=&storage;
+  }
+
+  
+  out->print("[");
   for(int i=0;i<num_sensors;i++ ) {
     if ( sensors[i]->enabled ) {
-      sensors[i]->write_frame_info(Serial);
+      sensors[i]->write_frame_info(*out);
     }
   }
-  Serial.println("]");
+  out->println("]");
 }
 
 // header is written sync, and sampling and data output are async.
@@ -304,18 +319,21 @@ void timer_isr(void) {
 
 // asynchronous repeated sampling
 void SeaDuck::continuous_sample(void) {
-  unsigned long t_start=millis();
+  elapsedMillis elapsed;
+
+  // start with data definition
+  write_header();
 
   Serial.println("# Starting interval timer loop");
   Timer.begin(timer_isr,sample_interval_us);
 
-  // for testing -- loop for a limited amount
-  // of time:
-  // while ( millis()-t_start < 60000 ) {
-  // real deal - loop indefinitely
   while ( 1 ) {
 #ifdef STATUS_LED
-    digitalWrite(STATUS_LED,HIGH);
+    if(elapsed<30*1000) {
+      digitalWrite(STATUS_LED,HIGH);
+    } else {
+      digitalWrite(STATUS_LED,LOW);
+    }          
 #endif
     storage.loop();
 

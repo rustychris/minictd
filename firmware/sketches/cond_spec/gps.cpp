@@ -53,12 +53,13 @@ void GPS::watch(void) {
 
     // With interrupt handler, should see them here
     while(read_sentence!=write_sentence) {
-      Serial.print("NMEA (read=");
-      Serial.print(read_sentence);
-      Serial.print(" write=");
-      Serial.print(write_sentence);
-      Serial.print("): ");
-      Serial.print(sentence_buff[read_sentence]);
+      //Serial.print("NMEA (read=");
+      //Serial.print(read_sentence);
+      //Serial.print(" write=");
+      //Serial.print(write_sentence);
+      //Serial.print("): ");
+      Serial.print("NMEA=");
+      Serial.print(sentence_buff[read_sentence]); // has its own newline, I think
       read_sentence=(read_sentence+1)%MAX_NMEA_SENTENCES;
     }
 

@@ -6,10 +6,10 @@
 // #include "cfg_ntc.h"
 
 #include "cfg_imu.h"
-#include "cfg_pressure.h"
-#include "cfg_rtc_ds3231.h"
+// #include "cfg_pressure.h"
+// #include "cfg_rtc_ds3231.h"
 #include "cfg_gps.h"
-#include "cfg_motor.h"
+// #include "cfg_motor.h"
 
 
 // if defined, a digital output tied to the enable pin of the LDO

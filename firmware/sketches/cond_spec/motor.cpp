@@ -136,7 +136,14 @@ bool Motor::dispatch_command(const char *cmd, const char *cmd_arg) {
 
 void Motor::help() {
   Serial.println("  Motor");
-  Serial.println("    motor  # report sense and drive");
+  Serial.println("    motor               # report sense and drive");
+  Serial.println("    motor_enable        # report motor enable status");
+  Serial.println("    motor_enable=[0,1]  # disarm/arm motor");
+  Serial.println("    motor_off           # all motors off");
+  Serial.println("    motor_a_fwd         # motor A forward until keypress");
+  Serial.println("    motor_a_rev         # motor A reverse until keypress");
+  Serial.println("    motor_b_fwd         # motor B forward until keypress");
+  Serial.println("    motor_b_rev         # motor B reverse until keypress");
 }
   
 void Motor::write_frame_info(Print &out) { }
