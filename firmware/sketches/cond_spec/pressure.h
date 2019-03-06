@@ -11,6 +11,7 @@ public:
   
   virtual void init();
   virtual void async_read();
+  void async_copyValues();
   void display();
   
   virtual bool dispatch_command(const char *cmd, const char *cmd_arg);
@@ -19,7 +20,7 @@ public:
   virtual void write_data(Print &out);
   
   int32_t pressure_baseline_dPa;
-  
+
   int32_t pressure_abs_dPa;
   int32_t temperature_c100;
 };

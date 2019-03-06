@@ -23,23 +23,31 @@ void Pressure::async_read() {
   // set to known values to know if they actually ran.
   sensor.temperature_raw=37;
   sensor.pressure_raw=37;
+
+  push_fn(this,(SensorFn)&Pressure::async_copyValues);
+  
   // first is temperature precision, second is pressure precision
   // sensor.async_getMeasurements(ADC_4096,ADC_4096);
   sensor.async_getMeasurements(ADC_1024,ADC_1024);
+}
+
+void Pressure::async_copyValues() {
+  pressure_abs_dPa=sensor._pressure_actual;
+  temperature_c100=sensor._temperature_actual;
+  pop_fn_and_call();
 }
 
 void Pressure::display(){
   read();
   
   Serial.print("temp_ms5803=");
-  Serial.println(sensor._temperature_actual / 100.0f);
+  Serial.println(temperature_c100 / 100.0f);
   
   Serial.print("press_abs_mbar=");
-  // use to use this->pressure_abs_dPa
-  Serial.println(sensor._pressure_actual / 10.0f);
+  Serial.println(pressure_abs_dPa / 10.0f);
      
   Serial.print("press_delta_dbar=");
-  Serial.println( ( (sensor._pressure_actual-pressure_baseline_dPa)/1000.0 ) ); 
+  Serial.println( ( (pressure_abs_dPa-pressure_baseline_dPa)/1000.0f ) ); 
 }
 
 bool Pressure::dispatch_command(const char *cmd, const char *cmd_arg) {

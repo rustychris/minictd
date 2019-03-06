@@ -79,6 +79,8 @@ void Motor::command(int motor,int cmd) {
 void Motor::async_read() {
   // no work for motor yet, but we still have to play nice
   // and keep the ball in the air.
+  // in the future may include checks for current draw here
+  // to be logged
   pop_fn_and_call();
 }
 
@@ -235,7 +237,23 @@ void Motor::help() {
   Serial.println("    motor_b_rev         # motor B reverse until keypress");
 }
   
-void Motor::write_frame_info(Print &out) { }
-void Motor::write_data(Print &out){ }
+void Motor::write_frame_info(Print &out) {
+  out.print("('motor_status','<i2',2),('motor_sense','<i2',2),");
+}
+
+typedef struct {
+  int16_t a_status,b_status;
+  int16_t a_sense,b_sense;
+} full_record;
+
+void Motor::write_data(Print &out){
+  full_record rec;
+  rec.a_status=a_status;
+  rec.b_status=b_status;
+  rec.a_sense=(int16_t)a_sense;
+  rec.b_sense=(int16_t)b_sense;
+  
+  write_base16(out,(uint8_t*)&rec,sizeof(rec));
+}
 
 #endif // HAS_MOTOR

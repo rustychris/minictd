@@ -72,9 +72,74 @@ void Buoyancy::enable(void) {
 }
 
 void Buoyancy::async_read() {
-  // For now this just updates readings
+  if ( !enabled ) {
+    pop_fn_and_call();
+    return;
+  }
+
+  // check for end of mission
+  if ( mission_time > 1000*mission_seconds ) {
+    motor.command(BUOY_MTR_SEL,BUOY_MTR_POS);
+    pop_fn_and_call();
+    return;
+  }
+
+  // Otherwise we're in the control loop
   
+  // Update w estimatte
+  float w_instant;
+
+  // from pressure.cpp --
+  //  mbar is dPa/10
+  //  bar is 100 kPa, so mbar 100Pa
+  //  and dPa would then be 10Pa, so decaPascals.
   
+  // so the raw readings are potentially mm of water.
+  // assuming 'actual' readings are in decaPascals,
+  // scale that by 1000, and 
+  
+  // 1000*dPa / ms, approx mm/s
+  // May need further scaling to get the right resolution.
+
+  // mm/ms ~ m/s
+  long dt_ms=since_last;
+  since_last=0;
+  
+  w_instant=(pressure_last_dPa - pressure.pressure_abs_dPa);
+  w_instant /= dt_ms;
+
+  Serial.print("w_instant (m/s): ");
+  Serial.println(w_instant,6);
+
+  // T_lowpass convert to ms, 
+  float alpha=dt_ms/(1000*T_lowpass);
+
+  if (alpha<1.0) {
+    w_mps=alpha*w_instant + (1-alpha)*w_mps;
+  } else {
+    w_mps=w_instant;
+  }
+
+  pressure_last_dPa=pressure.pressure_abs_dPa;
+
+  // CONTROL
+  // Current depth, positive up
+  float z_m=(atm_press_dPa-pressure_last_dPa)/1000.0;
+  float prop=z_m-depth_target;
+  //   depth error   +   derivative term
+  float PD=prop + w_mps*T_deriv;
+
+  if(PD>deadband) { // above target
+    Serial.println("command negative");
+    motor.command(BUOY_MTR_SEL,BUOY_MTR_NEG);
+  } else if(PD<deadband) { // below target
+    Serial.println("command positive");
+    motor.command(BUOY_MTR_SEL,BUOY_MTR_POS);
+  } else {
+    Serial.println("command off");
+    motor.command(BUOY_MTR_SEL,MOTOR_OFF);
+  }
+
   // and keep the ball in the air.
   pop_fn_and_call();
 }
@@ -83,7 +148,7 @@ void Buoyancy::display(void) {
   Serial.print("buoyancy_enable="); Serial.println( enabled );
 }
 
-void set_float(char *arg,float *orig,char *label) {
+void set_float(const char *arg,float *orig,const char *label) {
   float tmp;
   char *endp;
   
@@ -116,17 +181,30 @@ void Buoyancy::start_mission(void) {
 
   motor.enable();
 
-  motor.command(MTR_SEL,MTR_POS);
+  motor.command(BUOY_MTR_SEL,BUOY_MTR_POS);
 
   // be sure it goes until it hits the limit.
   while ( motor.wait_and_stop() != MOTOR_LIMIT ) {
     Serial.println("Appears not have hit its limit");
   }
 
-  pick up HERE
+  Serial.println("At full positive -- beginning mission");
+
+  mission_time=0;
+
+  // Make sure we have an up to date pressure reading
+  pressure.read();
+  atm_press_dPa=pressure.pressure_abs_dPa;
+  Serial.print("Atmospheric pressure recorded as ");
+  Serial.print(atm_press_dPa/1000.0f);
+  Serial.println("dbar");
+  
+  // Set Buoyancy state so that once the sample loop is going
+  // the PD loop will begin.
+  enabled=true; // affects whether sample loop will
 }
 
-void set_int(char *arg,int *orig,char *label) {
+void set_int(const char *arg,int *orig,const char *label) {
   int tmp;
   char *endp;
   
@@ -134,7 +212,7 @@ void set_int(char *arg,int *orig,char *label) {
     Serial.print(label); Serial.print("="); Serial.println(*orig);
     return;
   } else {
-    tmp=strtoi(arg,&endp);
+    tmp=strtol(arg,&endp,10);
     
     if ( endp==arg ) {
       Serial.println("Could not parse number");
@@ -159,7 +237,7 @@ bool Buoyancy::dispatch_command(const char *cmd, const char *cmd_arg) {
   } else if(!strcmp(cmd,"buoy_duration")) {
     set_int(cmd_arg,&mission_seconds,"buoy_duration");
   } else if(!strcmp(cmd,"buoy_depth")) {
-    set_float(cmd_arg,&mission_seconds,"buoy_depth");
+    set_float(cmd_arg,&depth_target,"buoy_depth");
   } else if(!strcmp(cmd,"buoy_start")) {
     start_mission();
   } else {
@@ -177,6 +255,7 @@ void Buoyancy::help() {
   Serial.println("    buoy_deadband[=meters]   # error deadband");
   Serial.println("    buoy_duration[=seconds]  # duration for target depth");
   Serial.println("    buoy_depth[=meters]      # target depth");
+  Serial.println("    buoy_start               # prepare and start mission");
 }
   
 void Buoyancy::write_frame_info(Print &out) { }

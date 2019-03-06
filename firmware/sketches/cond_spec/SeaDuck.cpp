@@ -48,6 +48,11 @@ GPS gps;
 Motor motor;
 #endif
 
+#ifdef HAS_BUOYANCY
+#include "buoyancy.h"
+Buoyancy buoyancy;
+#endif
+
 #ifdef DOTSTAR_CLK
 #include <Adafruit_DotStar.h>
 Adafruit_DotStar dotstar = Adafruit_DotStar(1,DOTSTAR_DATA,DOTSTAR_CLK);  
@@ -149,6 +154,11 @@ SeaDuck::SeaDuck()
 #ifdef HAS_MOTOR
   sensors[num_sensors++]=&motor;
 #endif
+  
+#ifdef HAS_BUOYANCY
+  // Should be *after* pressure
+  sensors[num_sensors++]=&buoyancy;
+#endif
 
 #ifdef POWER_3V3_ENABLE_PIN
   pinMode(POWER_3V3_ENABLE_PIN,OUTPUT);
@@ -244,15 +254,12 @@ time_t SeaDuck::unixtime() {
 #endif
 }
 
-// HERE - this needs to be routed to SD when available.
 void SeaDuck::write_header(void) {
   Print *out=&Serial;
   
   if( storage.status==Storage::ENABLED ) {
     out=&storage;
   }
-
-  
   out->print("[");
   for(int i=0;i<num_sensors;i++ ) {
     if ( sensors[i]->enabled ) {

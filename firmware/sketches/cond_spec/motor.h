@@ -79,8 +79,8 @@ private:
   float a_decay;
   float b_decay;
   
-  int a_status;
-  int b_status;
+  int16_t a_status;
+  int16_t b_status;
 };
   
 #endif // MOTOR_H
