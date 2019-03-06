@@ -35,10 +35,45 @@ void Motor::enable(void) {
 }
 
 void Motor::all_off(void){
-  digitalWrite(MOTOR_A1,0);
-  digitalWrite(MOTOR_A2,0);
-  digitalWrite(MOTOR_B1,0);
-  digitalWrite(MOTOR_B2,0);
+  command(MOTOR_A|MOTOR_B,MOTOR_OFF);
+}
+
+// handle requests for state transitions 
+void Motor::command(int motor,int cmd) {
+  if (cmd==MOTOR_OFF) {
+    if(motor&MOTOR_A) {
+      digitalWrite(MOTOR_A1,0);
+      digitalWrite(MOTOR_A2,0);
+      a_status=MOTOR_OFF;
+    }
+    if (motor&MOTOR_B) {
+      digitalWrite(MOTOR_B1,0);
+      digitalWrite(MOTOR_B2,0);
+      b_status=MOTOR_OFF;
+    } 
+  } else if (cmd==MOTOR_FWD) {
+    if(motor&MOTOR_A) {
+      digitalWrite(MOTOR_A1,1);
+      digitalWrite(MOTOR_A2,0);
+      a_status=MOTOR_FWD;
+    }
+    if(motor&MOTOR_B) {
+      digitalWrite(MOTOR_B1,1);
+      digitalWrite(MOTOR_B2,0);
+      b_status=MOTOR_FWD;
+    }
+  } else if (cmd==MOTOR_REV) {
+    if(motor&MOTOR_A) {
+      digitalWrite(MOTOR_A1,0);
+      digitalWrite(MOTOR_A2,1);
+      a_status=MOTOR_REV;
+    }
+    if(motor&MOTOR_B) {
+      digitalWrite(MOTOR_B1,0);
+      digitalWrite(MOTOR_B2,1);
+      b_status=MOTOR_REV;
+    }
+  }  
 }
 
 void Motor::async_read() {
@@ -47,41 +82,99 @@ void Motor::async_read() {
   pop_fn_and_call();
 }
 
-void Motor::display(unsigned int select) {
-  int a_sense=analogRead(MOTOR_ASENSE) - a_sense_offset;
-  int b_sense=analogRead(MOTOR_BSENSE) - b_sense_offset;
-
-  if( select & DISP_ENABLE ) {
-    Serial.print("motor_enable="); Serial.println( enabled );
-  }
-  
-  if(select & DISP_SENSE ) {
-    Serial.print("motor_a_sense="); Serial.println(a_sense);
-    Serial.print("motor_b_sense="); Serial.println(b_sense);
+void Motor::read_current(int motor){
+  // read motor current for one or both, and update limit status
+  // for motors currently on.
+  if (motor&MOTOR_A) {
     // this comes in as counts, and defaults to 10 bits over
     // the 0..3.3V range.
+    a_sense=analogRead(MOTOR_ASENSE) - a_sense_offset;
+    a_current=a_decay*a_current + (1-a_decay)*a_sense*3.3/4096.0/MOTOR_ASENSE_R;
+    if (  (a_status&(MOTOR_FWD|MOTOR_REV)) && (a_current<a_current_threshold) ) {
+      Serial.println("LIMIT"); // temporary
+      a_status |= MOTOR_LIMIT;
+    }
   }
-
-  if(select&DISP_CURRENT) {
-    Serial.print("motor_a_current="); Serial.println(a_sense*3.3/4096.0/MOTOR_ASENSE_R,3);
-    Serial.print("motor_b_current="); Serial.println(b_sense*3.3/4096.0/MOTOR_BSENSE_R,3);
+  if (motor&MOTOR_B) {
+    b_sense=analogRead(MOTOR_BSENSE) - b_sense_offset;
+    b_current=b_decay*b_current + (1-b_decay)*b_sense*3.3/4096.0/MOTOR_BSENSE_R;
+    if ( (b_status&(MOTOR_FWD|MOTOR_REV)) && (b_current<b_current_threshold) ) {
+      Serial.println("LIMIT"); // temporary
+      b_status |= MOTOR_LIMIT;
+    }
   }
 }
 
-void Motor::wait_and_stop() {
+void Motor::display(unsigned int select) {
+  if( select & DISP_ENABLE ) {
+    Serial.print("motor_enable="); Serial.println( enabled );
+  }
+
+  if( (a_status!=MOTOR_OFF) || (select&DISP_OFF) ) {
+    read_current(MOTOR_A);
+    if(select & DISP_SENSE ) {
+      Serial.print("motor_a_sense="); Serial.println(a_sense);
+    }
+    if(select & DISP_SENSE ) {
+      Serial.print("motor_a_sense="); Serial.println(a_sense);
+    }
+    if(select&DISP_CURRENT) {
+      Serial.print("motor_a_current="); Serial.println(a_current,3);
+    }
+    Serial.print("motor_a_status=");
+    if( a_status&MOTOR_FWD ) Serial.print(" FWD");
+    if( a_status&MOTOR_REV ) Serial.print(" REV");
+    if( a_status&MOTOR_LIMIT ) Serial.print(" LIMIT");
+    Serial.println();
+  }
+  if( (b_status!=MOTOR_OFF) || (select&DISP_OFF) ) {
+    read_current(MOTOR_B);
+    if(select & DISP_SENSE ) {
+      Serial.print("motor_b_sense="); Serial.println(b_sense);
+    }
+    if(select&DISP_CURRENT) {
+      Serial.print("motor_b_current="); Serial.println(b_current,3);
+    }
+    Serial.print("motor_b_status=");
+    if( b_status&MOTOR_FWD ) Serial.print(" FWD");
+    if( b_status&MOTOR_REV ) Serial.print(" REV");
+    if( b_status&MOTOR_LIMIT ) Serial.print(" LIMIT");
+    Serial.println();
+  }
+}
+
+int Motor::wait_and_stop() {
+  int condition=0;
+  
   // flush input buffer, then stop on any input
   while(Serial.available() ) { Serial.read(); }
 
   while(1) {
     if( Serial.available() ) {
       uint8_t c=Serial.read();
-      all_off();
       break;
     } else {
       display(DISP_CURRENT);
+      // that gets us fresh limit status
+      if(a_status&MOTOR_LIMIT) {
+        Serial.println("# Motor A detected limit switch");
+        command(MOTOR_A,MOTOR_OFF);
+        condition=MOTOR_LIMIT;
+      }
+      if(b_status&MOTOR_LIMIT) {
+        Serial.println("# Motor B detected limit switch");
+        command(MOTOR_B,MOTOR_OFF);
+        condition=MOTOR_LIMIT;
+      }
+      if( (a_status==MOTOR_OFF) && (b_status==MOTOR_OFF) ){
+        Serial.println("# All motors off");
+        break;
+      }
       delay(40);
     }
   }
+  all_off(); // partially redundant, but that's fine.
+  return condition; 
 }
 
 bool Motor::dispatch_command(const char *cmd, const char *cmd_arg) {
@@ -90,29 +183,25 @@ bool Motor::dispatch_command(const char *cmd, const char *cmd_arg) {
   } else if(!strcmp(cmd,"motor_a_fwd")) {
     if ( !enabled ){ Serial.println("Motor is not enabled"); }
     else {
-      digitalWrite(MOTOR_A1,1);
-      digitalWrite(MOTOR_A2,0);
+      command(MOTOR_A,MOTOR_FWD);
       wait_and_stop();
     }
   } else if(!strcmp(cmd,"motor_a_rev")) {
     if ( !enabled ){ Serial.println("Motor is not enabled"); }
     else {
-      digitalWrite(MOTOR_A1,0);
-      digitalWrite(MOTOR_A2,1);
+      command(MOTOR_A,MOTOR_REV);
       wait_and_stop();
     }
   } else if(!strcmp(cmd,"motor_b_fwd")) {
     if ( !enabled ){ Serial.println("Motor is not enabled"); }
     else {
-      digitalWrite(MOTOR_B1,1);
-      digitalWrite(MOTOR_B2,0);
+      command(MOTOR_B,MOTOR_FWD);
       wait_and_stop();
     }
   } else if(!strcmp(cmd,"motor_b_rev")) {
     if ( !enabled ) { Serial.println("Motor is not enabled"); }
     else {
-      digitalWrite(MOTOR_B1,0);
-      digitalWrite(MOTOR_B2,1);
+      command(MOTOR_B,MOTOR_REV);
       wait_and_stop();
     }
   } else if(!strcmp(cmd,"motor_off")) {

@@ -53,11 +53,6 @@ void GPS::watch(void) {
 
     // With interrupt handler, should see them here
     while(read_sentence!=write_sentence) {
-      //Serial.print("NMEA (read=");
-      //Serial.print(read_sentence);
-      //Serial.print(" write=");
-      //Serial.print(write_sentence);
-      //Serial.print("): ");
       Serial.print("NMEA=");
       Serial.print(sentence_buff[read_sentence]); // has its own newline, I think
       read_sentence=(read_sentence+1)%MAX_NMEA_SENTENCES;
@@ -79,14 +74,36 @@ void GPS::record_byte(char c) {
   if((c=='$') || (write_char>=MAX_SENTENCE_LENGTH-1)) {
     // null terminate that 
     sentence_buff[write_sentence][write_char]=0;
-    write_sentence=(write_sentence+1)%MAX_NMEA_SENTENCES;
-    write_char=0;
-    if ( read_sentence==write_sentence ) {
-      // Serial.println("Write overrun");
-      // the write pointer has overtaken the read pointer.
-      // favor new data over old, so we bump the read pointer
-      // TODO: Check for race conditions
-      read_sentence=(read_sentence+1)%MAX_NMEA_SENTENCES;
+    // this is when we decide whether to keep this sentence
+    
+    if( false 
+#ifdef IGNORE_NMEA_GPGSV
+        || strncmp(sentence_buff[write_sentence],"$GPGSV",6)==0
+#endif
+#ifdef IGNORE_NMEA_GPGGA
+        || strncmp(sentence_buff[write_sentence],"$GPGGA",6)==0
+#endif
+#ifdef IGNORE_NMEA_GPGLL
+        || strncmp(sentence_buff[write_sentence],"$GPGLL",6)==0
+#endif
+#ifdef IGNORE_NMEA_GPVTG
+        || strncmp(sentence_buff[write_sentence],"$GPVTG",6)==0
+#endif
+        ) {
+      // Will ignore this sentence -- keep write_sentece the same
+      // and start overwriting at 0.
+      write_char=0;
+    } else {
+      // move on to next sentence
+      write_sentence=(write_sentence+1)%MAX_NMEA_SENTENCES;
+      write_char=0;
+      if ( read_sentence==write_sentence ) {
+        // Serial.println("Write overrun");
+        // the write pointer has overtaken the read pointer.
+        // favor new data over old, so we bump the read pointer
+        // TODO: Check for race conditions
+        read_sentence=(read_sentence+1)%MAX_NMEA_SENTENCES;
+      }
     }
   }
 
@@ -119,16 +136,33 @@ void GPS::help(void) {
 #define STR(s) #s
 
 void GPS::write_frame_info(Print &out) {
-  out.print("('gps_nmea','U" XSTR(MAX_SENTENCE_LENGTH) "'," XSTR(MAX_NMEA_SENTENCES) "),");
+  // used to use U, but binary interpretation in numpy requires
+  // S, which implies byte string
+  out.print("('gps_nmea','S" XSTR(MAX_SENTENCE_LENGTH) "'," XSTR(MAX_NMEA_SENTENCES) "),");
 }
 
 void GPS::write_data(Print &out) {
-  int count;
   static char empty[MAX_SENTENCE_LENGTH]="";
-  while(read_sentence!=write_sentence) {
+  int write_sentence_copy;
+
+  int count=0;
+
+  // make a copy to avoid race conditions
+  // there is still the possibility of race conditions if the ring
+  // buffer overruns.
+  noInterrupts();
+  write_sentence_copy=write_sentence;
+  interrupts();
+  
+  while(read_sentence!=write_sentence_copy) {
     write_base16(out,(uint8_t*)&sentence_buff[read_sentence],MAX_SENTENCE_LENGTH);
-    // TODO: check for race conditions with writer.
+    memset((void*)(&sentence_buff[read_sentence]),0,MAX_SENTENCE_LENGTH);
+    
+    // TODO: double check for race conditions with writer.
+    noInterrupts();    
     read_sentence=(read_sentence+1)%MAX_NMEA_SENTENCES;
+    interrupts();
+    
     count++;
   }
   // pad out others

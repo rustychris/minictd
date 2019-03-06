@@ -190,30 +190,31 @@ void IMU::help() {
 }
 
 void IMU::write_frame_info(Print &out) {
-  out.print( "('imu_euler_deg','<f8',3),('imu_accel_m_s2','<f8',3),"
-             // "('cal_system','<u1'),('cal_gyro','<u1'),('cal_accel','<u1'),('cal_mag','<u1'),"
+  out.print( "('imu_euler_deg','<f4',3),('imu_accel_m_s2','<f4',3),"
+             "('cal_system','<u1'),('cal_gyro','<u1'),('cal_accel','<u1'),('cal_mag','<u1'),"
              );
 }
 
 typedef struct {
-  double euler_x, euler_y, euler_z;
-  double accel_x, accel_y, accel_z;
-  uint8_t cal_system, cal_gyro, cal_accel, cal_mag;
+  float euler_x, euler_y, euler_z;
+  float accel_x, accel_y, accel_z;
+  // try to avoid struct packing issues by putting these in an array
+  uint8_t cal[4]; // cal_system, cal_gyro, cal_accel, cal_mag;
 } full_record;
 
 void IMU::write_data(Print &out){
   full_record rec;
-  rec.euler_x=euler.x();
-  rec.euler_y=euler.y();
-  rec.euler_z=euler.z();
+  rec.euler_x=(float)euler.x();
+  rec.euler_y=(float)euler.y();
+  rec.euler_z=(float)euler.z();
 
-  rec.accel_x=accel.x();
-  rec.accel_y=accel.y();
-  rec.accel_z=accel.z();
-  rec.cal_system=cal_system;
-  rec.cal_gyro=cal_gyro;
-  rec.cal_accel=cal_accel;
-  rec.cal_mag=cal_mag;
+  rec.accel_x=(float)accel.x();
+  rec.accel_y=(float)accel.y();
+  rec.accel_z=(float)accel.z();
+  rec.cal[0]=cal_system;
+  rec.cal[1]=cal_gyro;
+  rec.cal[2]=cal_accel;
+  rec.cal[3]=cal_mag;
 
   write_base16(out,(uint8_t*)&rec,sizeof(rec));
 }
