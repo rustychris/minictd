@@ -3,6 +3,8 @@
 
 #ifdef HAS_IMU
 #include <AWire.h>
+#include "serialmux.h"
+
 #include "imu.h"
 // #define Wire AWire // this is done in my Adafruit_BNO055.h
 
@@ -20,20 +22,13 @@ void IMU::init(){
   if(!bno.begin())
     {
       /* There was a problem detecting the BNO055 ... check your connections */
-      Serial.print("Ooops, no BNO055 detected ... Check your wiring or I2C ADDR!");
+      mySerial.print("Ooops, no BNO055 detected ... Check your wiring or I2C ADDR!");
       while(1);
     }
   delay(1000); // wow - that's a long time.  maybe doesn't have to be so long??
 
-  /* Display the current temperature */
-  int8_t temp = bno.getTemp();
-  // Serial.print("# BNO055 Current Temperature: ");
-  // Serial.print(temp);
-  // Serial.println(" C");
-
+  int8_t temp = bno.getTemp(); // necessary?  probably not.
   bno.setExtCrystalUse(true);
-
-  // Serial.println("# BNO055 Calibration status values: 0=uncalibrated, 3=fully calibrated");
 }
 
 void IMU::async_read() {
@@ -41,17 +36,21 @@ void IMU::async_read() {
   // popped after the read is complete.
 
 #ifndef ASYNC_I2C
-  euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);
-  accel = bno.getVector(Adafruit_BNO055::VECTOR_LINEARACCEL);
+  euler=bno.getVector(Adafruit_BNO055::VECTOR_EULER);
+  accel=bno.getVector(Adafruit_BNO055::VECTOR_LINEARACCEL);
 
-  // euler.x(), .y(), .z()
-  // accel.x(), .y(), .z()
+  if(read_mag) {
+    magnet=bno.getVector(Adafruit_BNO055::VECTOR_MAGNETOMETER);
+  }
 
   bno.getCalibration(&cal_system, &cal_gyro, &cal_accel, &cal_mag);
   pop_fn_and_call();
 #else
   push_fn(this,(SensorFn)&IMU::async_readEuler);
   push_fn(this,(SensorFn)&IMU::async_readAccel);
+  if(read_mag) {
+    push_fn(this,(SensorFn)&IMU::async_readMagnet);
+  }
   pop_fn_and_call();
 #endif
 }
@@ -61,7 +60,7 @@ void IMU::async_read() {
 
 void IMU::async_readEuler(void) {
   // euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);
-  // Serial.println("async_readEuler");
+  // mySerial.println("async_readEuler");
   push_fn(this, (SensorFn)&IMU::async_readEuler2);
   async_getVector(Adafruit_BNO055::VECTOR_EULER);
 }
@@ -69,14 +68,14 @@ void IMU::async_readEuler(void) {
 void IMU::async_readEuler2(void) {
   //case VECTOR_EULER:
   /* 1 degree = 16 LSB */
-  // Serial.println("async_readEuler2");
+  // mySerial.println("async_readEuler2");
   for(int i=0;i<3;i++)
     euler[i]=0.0625*target[i];// 1/16.
   pop_fn_and_call();
 }
 
 void IMU::async_readAccel(void) {
-  // /Serial.println("async_readAccel");
+  // /mySerial.println("async_readAccel");
   push_fn(this, (SensorFn)&IMU::async_readAccel2);
   async_getVector(Adafruit_BNO055::VECTOR_LINEARACCEL);
 }
@@ -86,11 +85,29 @@ void IMU::async_readAccel2(void) {
   // case VECTOR_LINEARACCEL:
   // case VECTOR_GRAVITY:
   /* 1m/s^2 = 100 LSB */
-  // Serial.println("async_readAccel2");
-  // Serial.print("accel[0] ");
-  // Serial.println(accel[0]);
+  // mySerial.println("async_readAccel2");
+  // mySerial.print("accel[0] ");
+  // mySerial.println(accel[0]);
   for(int i=0;i<3;i++)
     accel[i]=0.01*target[i];// 1/100
+  
+  pop_fn_and_call();
+}
+
+void IMU::async_readMagnet(void) {
+  push_fn(this, (SensorFn)&IMU::async_readMagnet2);
+  async_getVector(Adafruit_BNO055::VECTOR_MAGNETOMETER);
+}
+
+void IMU::async_readMagnet2(void) {
+  // case VECTOR_MAGNETOMETER:
+  /* 1uT = 16 LSB */
+  // xyz[0] = ((double)x)/16.0;
+  // xyz[1] = ((double)y)/16.0;
+  // xyz[2] = ((double)z)/16.0;
+  
+  for(int i=0;i<3;i++)
+    magnet[i]=target[i]/16.0;
   
   pop_fn_and_call();
 }
@@ -116,53 +133,80 @@ void IMU::async_readVector1(void) {
 void IMU::async_readVector2(void) {
   // 2 bytes per each of 3 components:
   AWire.onReqFromDone(NULL);
-  // Serial.println("hit readVector2");
+  // mySerial.println("hit readVector2");
   uint8_t lsb,msb;
   int16_t combined;
   for (uint8_t i = 0; i < 3; i++) {
     lsb = AWire.read();
     msb = AWire.read();
     combined=( ((int16_t)lsb) | (((int16_t)msb) << 8) );
-    // Serial.print("  combined: ");
-    // Serial.println(combined);
+    // mySerial.print("  combined: ");
+    // mySerial.println(combined);
     target[i] = combined ;
-    // Serial.print("  in target: ");
-    // Serial.println(target[i]);
+    // mySerial.print("  in target: ");
+    // mySerial.println(target[i]);
   }
   pop_fn_and_call();
 }
 
+void IMU::watch() {
+  while(mySerial.available()) {mySerial.read();}
+
+  while(!mySerial.available()) {
+    display();
+  }
+  mySerial.read();
+}
+
 void IMU::display(){
+  int col=0;
+  
   read();
   
-  Serial.print("euler_angles=[");
-  Serial.print(euler.x());
-  Serial.print(",");
-  Serial.print(euler.y());
-  Serial.print(",");
-  Serial.print(euler.z());
-  Serial.println("]");
+  col+=mySerial.print("euler_angles=[");
+  col+=mySerial.print(euler.x());
+  col+=mySerial.print(",");
+  col+=mySerial.print(euler.y());
+  col+=mySerial.print(",");
+  col+=mySerial.print(euler.z());
+  col+=mySerial.print("]  ");
 
-  Serial.print("linear_accel=[");
-  Serial.print(accel.x());
-  Serial.print(",");
-  Serial.print(accel.y());
-  Serial.print(",");
-  Serial.print(accel.z());
-  Serial.println("]");
+  while(col<40) col+=mySerial.print(" ");
+  col=0;
+  col+=mySerial.print("linear_accel=[");
+  col+=mySerial.print(accel.x());
+  col+=mySerial.print(",");
+  col+=mySerial.print(accel.y());
+  col+=mySerial.print(",");
+  col+=mySerial.print(accel.z());
+  col+=mySerial.print("]  ");
+
+  if(read_mag) {
+    while(col<40) col+=mySerial.print(" ");
+    col=0;
+    col+=mySerial.print("magnetometer=[");
+    col+=mySerial.print(magnet.x());
+    col+=mySerial.print(",");
+    col+=mySerial.print(magnet.y());
+    col+=mySerial.print(",");
+    col+=mySerial.print(magnet.z());
+    col+=mySerial.print("]");
+  }
+  
+  mySerial.println();
 }
 
 void IMU::display_cal(void) {
   bno.getCalibration(&cal_system,&cal_gyro,&cal_accel,&cal_mag);
 
-  Serial.print("cal_system=");
-  Serial.println(cal_system,DEC);
-  Serial.print("cal_gyro=");
-  Serial.println(cal_gyro,DEC);
-  Serial.print("cal_accel=");
-  Serial.println(cal_accel,DEC);
-  Serial.print("cal_mag=");
-  Serial.println(cal_mag,DEC);
+  mySerial.print("cal_system=");
+  mySerial.println(cal_system,DEC);
+  mySerial.print("cal_gyro=");
+  mySerial.println(cal_gyro,DEC);
+  mySerial.print("cal_accel=");
+  mySerial.println(cal_accel,DEC);
+  mySerial.print("cal_mag=");
+  mySerial.println(cal_mag,DEC);
 }
 
 bool IMU::dispatch_command(const char *cmd, const char *cmd_arg) {
@@ -170,11 +214,19 @@ bool IMU::dispatch_command(const char *cmd, const char *cmd_arg) {
     display();
   } else if ( !strcmp(cmd,"imu_cal") ) {
     display_cal();
+  } else if ( !strcmp(cmd,"imu_watch")) {
+    watch();
   } else if ( strcmp(cmd,"imu_enable")==0 ) {
     if(cmd_arg) {
       enabled=(bool)atoi(cmd_arg);
     } else {
-      Serial.print("imu_enable="); Serial.println( enabled );
+      mySerial.print("imu_enable="); mySerial.println( enabled );
+    }
+  } else if ( strcmp(cmd,"imu_magnet")==0 ) {
+    if(cmd_arg) {
+      read_mag=(bool)atoi(cmd_arg);
+    } else {
+      mySerial.print("imu_magnet="); mySerial.println( read_mag );
     }
   } else {
     return false;
@@ -183,10 +235,11 @@ bool IMU::dispatch_command(const char *cmd, const char *cmd_arg) {
 }
 
 void IMU::help() {
-  Serial.println("  IMU");
-  Serial.println("    imu              # report orientation and linear acceleration");
-  Serial.println("    imu_cal          # report sensor calibration state");
-  Serial.println("    imu_enable[=0,1] # enable/disable ");
+  mySerial.println("  IMU");
+  mySerial.println("    imu              # report orientation and linear acceleration");
+  mySerial.println("    imu_cal          # report sensor calibration state");
+  mySerial.println("    imu_enable[=0,1] # enable/disable ");
+  mySerial.println("    imu_magnet[=0,1]    # enable/disable reading of magnetometer");
 }
 
 void IMU::write_frame_info(Print &out) {

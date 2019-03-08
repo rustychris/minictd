@@ -82,13 +82,13 @@ void Thermistor::async_read_result(void)
 bool Thermistor::dispatch_command(const char *cmd, const char *cmd_arg) {
   if( strcmp(cmd,"temperature")==0 ) {
     read();
-    Serial.print("temperature=");
-    Serial.println(reading);
+    mySerial.print("temperature=");
+    mySerial.println(reading);
   } else if ( strcmp(cmd,"temperature_enable")==0 ) {
     if(cmd_arg) {
       enabled=(bool)atoi(cmd_arg);
     } else {
-      Serial.print("temperature_enable="); Serial.println( enabled );
+      mySerial.print("temperature_enable="); mySerial.println( enabled );
     }
   } else {
     return false;
@@ -97,9 +97,9 @@ bool Thermistor::dispatch_command(const char *cmd, const char *cmd_arg) {
 }
 
 void Thermistor::help() {
-  Serial.println("  Thermistor");
-  Serial.println("    temperature  # read the thermistor and print the result");
-  Serial.println("    temperature_enable[=0,1] # enable/disable");
+  mySerial.println("  Thermistor");
+  mySerial.println("    temperature  # read the thermistor and print the result");
+  mySerial.println("    temperature_enable[=0,1] # enable/disable");
 }
 
 void Thermistor::write_frame_info(Print &out) {

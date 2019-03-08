@@ -3,29 +3,21 @@
 #include <elapsedMillis.h>
 
 #include "Shell.h"
-
+#include "serialmux.h"
 
 void Shell::setup(void) {
   mode = MODE_BOOT;
   request_mode = MODE_COMMAND;
 
-  Serial.begin(115200);
+  mySerial.begin(115200);
   elapsedMillis elapsed;
   // for debugging, it's nice to see the start
   // of everything, so wait a few seconds.
   // then plow ahead so we can also be functional
   // headless.
-  while( (!Serial) && (elapsed<3000) );
+  while( (!mySerial) && (elapsed<3000) );
 
-  // Any chance this causes heartache?
-  // pinMode(LED_BUILTIN,OUTPUT);
-  // for(int i=0;i<3;i++) {
-  //   digitalWrite(LED_BUILTIN, HIGH);
-  //   delay(200);
-  //   digitalWrite(LED_BUILTIN, LOW);
-  //   delay(100);
-  // }
-  Serial.println("# Hello");
+  mySerial.println("# Hello");
 }
 
 void Shell::loop(void) {
@@ -59,8 +51,8 @@ void Shell::dispatch_command(void) {
     delay(100); // restart has a small lag
     // never gets here
   } else {
-    Serial.println("\nUNKNOWN_COMMAND");
-    Serial.println(cmd);
+    mySerial.println("\nUNKNOWN_COMMAND");
+    mySerial.println(cmd);
   }
 }
 
@@ -68,14 +60,14 @@ bool Shell::activate_cmd_file(const char *fname) {
   // Check if file exists
   SdFile file; // Should this be SdFile ??
   if ( file.open(fname,O_READ) ) {
-    Serial.print("# Found cmd file ");
-    Serial.println(fname);
+    mySerial.print("# Found cmd file ");
+    mySerial.println(fname);
     strcpy(cmd_filename,fname);
     cmd_file_pos=0;
     return true;
   } else {
-    Serial.print("# Command file not activated: ");
-    Serial.println(fname);
+    mySerial.print("# Command file not activated: ");
+    mySerial.println(fname);
     
     cmd_filename[0]='\0';
     cmd_file_pos=0;
@@ -87,6 +79,8 @@ void Shell::get_next_command(const char *prompt) {
   //  show prompt and then wait for a complete
   //  line of input.
 
+  // TODO: allow # comment character in first column
+  
   bool use_serial=(!cmd_filename[0]);
   
   SdFile file;
@@ -96,8 +90,8 @@ void Shell::get_next_command(const char *prompt) {
 
   if( !use_serial ) {
     if ( !file.open(cmd_filename,O_READ) ) {
-      Serial.print("Failed to open cmd file");
-      Serial.println(cmd_filename);
+      mySerial.print("Failed to open cmd file");
+      mySerial.println(cmd_filename);
       use_serial=true;
     } else {
       file.seekSet(cmd_file_pos);
@@ -107,16 +101,16 @@ void Shell::get_next_command(const char *prompt) {
   while( pos==0 ) {
     // clear buffer before showing prompt
     if ( use_serial ) {
-      while( Serial.available() ) Serial.read();
-      Serial.print(prompt);
+      while( mySerial.available() ) mySerial.read();
+      mySerial.print(prompt);
     }
 
     cmd_arg=NULL;
     
     while(pos<CMD_BUFFLEN-1) {
       if( use_serial ) {
-        while(!Serial.available()) ;
-        cmd[pos] = Serial.read();
+        while(!mySerial.available()) ;
+        cmd[pos] = mySerial.read();
       } else {
         tmp=file.read();
         if( tmp<0 ) {
@@ -134,7 +128,7 @@ void Shell::get_next_command(const char *prompt) {
       
       // handle backspace, lamely.
       if( cmd[pos] == 8 ) {
-        Serial.print(" CANCEL");
+        mySerial.print(" CANCEL");
         pos = 0; // signal restart
         break;
       } else {
@@ -145,12 +139,12 @@ void Shell::get_next_command(const char *prompt) {
           // on connect, you can just hit enter a few times to make sure
           // there is a connection.
           if( use_serial )
-            Serial.println();
+            mySerial.println();
           cmd[pos] = '\0'; // null terminate it
           break;
         }
         if( use_serial )
-          Serial.print(cmd[pos]); // echo back to user
+          mySerial.print(cmd[pos]); // echo back to user
 
         // special handling for separate =
         if( cmd[pos]=='=' ) {
@@ -159,7 +153,7 @@ void Shell::get_next_command(const char *prompt) {
         }
         pos++;
         if(pos==CMD_BUFFLEN) { // protect overrun:
-          Serial.print(" TOO_LONG");
+          mySerial.print(" TOO_LONG");
           pos = 0; // signal restart
           break;
         }
@@ -171,7 +165,7 @@ void Shell::get_next_command(const char *prompt) {
 }
 
 void Shell::help(void){
-  Serial.println("Available commands:");
-  Serial.println("  System");
-  Serial.println("    softboot # reboot");
+  mySerial.println("Available commands:");
+  mySerial.println("  System");
+  mySerial.println("    softboot # reboot");
 }

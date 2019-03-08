@@ -5,6 +5,8 @@
 #include <Arduino.h>
 
 #include "cfg_seaduck.h"
+#include "serialmux.h"
+
 #include <SPI.h>
 #include <SdFat.h>
 
@@ -122,8 +124,8 @@ void Storage::set_next_active_filename(void) {
       for(active_filename[6]='0';active_filename[6]<='9';active_filename[6]++) {
         for(active_filename[7]='0';active_filename[7]<='9';active_filename[7]++) {
           if( ! sd.exists(active_filename) ) {
-            Serial.print("# Logging to ");
-            Serial.println(active_filename);
+            mySerial.print("# Logging to ");
+            mySerial.println(active_filename);
             return;
           }
         }
@@ -222,29 +224,29 @@ size_t Storage::write(uint8_t b) {
 
 void Storage::info() 
 {
-  Serial.print("storage_status=");
-  Serial.println(status);
-  Serial.print("storage_status_name=");
+  mySerial.print("storage_status=");
+  mySerial.println(status);
+  mySerial.print("storage_status_name=");
   if (status==DISABLED) {
-    Serial.println("DISABLED");
+    mySerial.println("DISABLED");
   } else if (status==NOCARD) {
-    Serial.println("NOCARD");
+    mySerial.println("NOCARD");
   } else if (status==ENABLED) {
-    Serial.println("ENABLED");
+    mySerial.println("ENABLED");
   }
-  Serial.print("overruns=");
-  Serial.println(overruns);
+  mySerial.print("overruns=");
+  mySerial.println(overruns);
 }
 
 bool confirm(void) {
   // be extra careful that we don't accidentally format
   // discard any extraneous characters:
-  while(Serial.available()) Serial.read();
+  while(mySerial.available()) mySerial.read();
   
-  Serial.println("Are you sure you want to proceed? Type y to confirm");
+  mySerial.println("Are you sure you want to proceed? Type y to confirm");
 
-  while(!Serial.available()) ; // wait for a key press
-  char key = Serial.read(); 
+  while(!mySerial.available()) ; // wait for a key press
+  char key = mySerial.read(); 
 
   return key == 'y';
 }
@@ -254,26 +256,26 @@ bool Storage::dispatch_command(const char *cmd, const char *cmd_arg) {
     if( confirm() )
       format('E');
     else {
-      Serial.println("Aborted");
+      mySerial.println("Aborted");
     }
   } else if ( strcmp(cmd,"format")==0 ) { 
     if( confirm() )
       format('F');
     else
-      Serial.println("Aborted");
+      mySerial.println("Aborted");
   } else if ( strcmp(cmd,"quickformat")==0 ) {
     if( confirm() )
       format('Q');
     else
-      Serial.println("Aborted");
+      mySerial.println("Aborted");
   } else if ( strcmp(cmd,"ls")==0) {
-    sd.ls(&Serial,LS_SIZE);
+    sd.ls(&mySerial,LS_SIZE);
   } else if ( strcmp(cmd,"sd_status")==0) {
     info();
   } else if ( strcmp(cmd,"sd_open")==0) {
     open_next_file();
-    Serial.print("# opened ");
-    Serial.println(active_filename);
+    mySerial.print("# opened ");
+    mySerial.println(active_filename);
   } else if ( strcmp(cmd,"sd_close")==0) {
     close_file();
   } else {
@@ -283,12 +285,12 @@ bool Storage::dispatch_command(const char *cmd, const char *cmd_arg) {
 }
 
 void Storage::help() {
-  Serial.println("  Storage");
-  Serial.println("    erase       # erase SD card");
-  Serial.println("    format      # format SD card");
-  Serial.println("    quickformat # as advertised");
-  Serial.println("    ls          # show files on sd card");
-  Serial.println("    sd_status   # display SD info");
-  Serial.println("    sd_open     # open next file for output");
-  Serial.println("    sd_close    # close current output file");
+  mySerial.println("  Storage");
+  mySerial.println("    erase       # erase SD card");
+  mySerial.println("    format      # format SD card");
+  mySerial.println("    quickformat # as advertised");
+  mySerial.println("    ls          # show files on sd card");
+  mySerial.println("    sd_status   # display SD info");
+  mySerial.println("    sd_open     # open next file for output");
+  mySerial.println("    sd_close    # close current output file");
 }

@@ -7,12 +7,13 @@
 
 #include "cfg_imu.h"
 
-// #include "cfg_gps.h"
+#include "cfg_gps.h"
 
-#include "cfg_pressure.h"
-#include "cfg_rtc_ds3231.h"
-#include "cfg_motor.h"
-#include "cfg_buoyancy.h"
+//#include "cfg_pressure.h"
+//#include "cfg_rtc_ds3231.h"
+//#include "cfg_motor.h"
+//#include "cfg_buoyancy.h"
+//#include "cfg_btserial.h"
 
 // if defined, a digital output tied to the enable pin of the LDO
 // #define POWER_3V3_ENABLE_PIN 3

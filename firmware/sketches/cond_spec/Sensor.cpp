@@ -1,5 +1,5 @@
 #include "Sensor.h"
-
+#include "serialmux.h"
 
 #pragma GCC optimize ("O0")
 
@@ -15,14 +15,14 @@ void Sensor::clear_busy(void) {
   busy--;
     
   if(busy<0) {
-    Serial.println("Busy went negative");
+    mySerial.println("Busy went negative");
     // while(1);
   }
 }
 
 void Sensor::push_busy(void) {
   if (busy>0) {
-    Serial.println("FAIL busy is already nonzero");
+    mySerial.println("FAIL busy is already nonzero");
   }
   busy++;
   // this line causes an internal compiler error for M0.
@@ -36,9 +36,12 @@ binary_format_t binary_format;
 uint8_t hexmap[]={'0','1','2','3','4','5','6','7',
                   '8','9','A','B','C','D','E','F'};
 
+// including null
+#define HEX_CHAR_PER_LINE 513
+
 void write_base16(Print &out,uint8_t *buff,int count)
 {
-  static uint8_t hexbuff[121];
+  static uint8_t hexbuff[HEX_CHAR_PER_LINE];
 
   int i=0;
   int pos=0;
@@ -48,14 +51,15 @@ void write_base16(Print &out,uint8_t *buff,int count)
       hexbuff[pos]  =hexmap[ (buff[i]>>4) & 0xF ];
       hexbuff[pos+1]=hexmap[  buff[i]     & 0xF ];
       pos+=2;
-      if( pos == 120 ) {
+      if( pos == HEX_CHAR_PER_LINE-1 ) {
         hexbuff[pos]='\n';
-        out.write(hexbuff,121);
+        out.write(hexbuff,HEX_CHAR_PER_LINE);
         pos=0;
       }
     }
     if( pos > 0 ){
-      hexbuff[pos]='\n';
+      // avoid so many newlines
+      // hexbuff[pos]='\n';
       out.write(hexbuff,pos+1);
     }
   } else {
@@ -74,7 +78,7 @@ int stack_size(void) {
 void push_fn(Sensor *s, SensorFn fn)
 {
   if (fn_stack_i>=FN_STACK_MAX) {
-    Serial.println("Sensor stack overflowed");
+    mySerial.println("Sensor stack overflowed");
     while(1);
   }
   fn_stack[fn_stack_i].s=s;
@@ -85,11 +89,11 @@ void push_fn(Sensor *s, SensorFn fn)
 
 void pop_fn() {
   // This is mostly for debugging, so leave it verbose
-  Serial.println("Pop no call");
+  mySerial.println("Pop no call");
   if( fn_stack_i > 0 ){
     fn_stack_i--;
   } else {
-    Serial.println("Stack empty");
+    mySerial.println("Stack empty");
   }
 }
 

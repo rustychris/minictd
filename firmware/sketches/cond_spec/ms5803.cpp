@@ -32,6 +32,8 @@ Distributed as-is; no warranty is given.
 
 #include <Arduino.h>
 
+#include "serialmux.h"
+
 #pragma GCC optimize ("O0")
 
 #include <AWire.h>
@@ -86,16 +88,16 @@ uint8_t MS5803::crc4(void)
 void MS5803::reset(void)
 // Reset device I2C
 {
-  // Serial.println("ms5803:reset()");
+  // mySerial.println("ms5803:reset()");
   // PRESS_WIRE.begin(); // only for special wire object
   
-  // Serial.println("ms5803:reset() myWire.begin() okay");
+  // mySerial.println("ms5803:reset() myWire.begin() okay");
   
   delay(10); // maybe helps??
 
   sendCommand(CMD_RESET);
   sensorWait(3);
-  // Serial.println("ms5803:after reset, waited 3ms");
+  // mySerial.println("ms5803:after reset, waited 3ms");
 }
 
 uint8_t MS5803::begin(void)
@@ -110,18 +112,18 @@ uint8_t MS5803::begin(void)
     uint8_t lowByte = PRESS_WIRE.read();
     coefficient[i] = (highByte << 8)|lowByte;
     // // Uncomment below for debugging output.
-    // Serial.print("C");
-    // Serial.print(i);
-    // Serial.print("= ");
-    // Serial.println(coefficient[i]);
+    // mySerial.print("C");
+    // mySerial.print(i);
+    // mySerial.print("= ");
+    // mySerial.println(coefficient[i]);
   }
   
-  // Serial.print("CRC calculated: ");
-  // Serial.println(crc4());
-  // Serial.print("CRC fetched: ");
-  // Serial.println(coefficient[7]&0x000F);
+  // mySerial.print("CRC calculated: ");
+  // mySerial.println(crc4());
+  // mySerial.print("CRC fetched: ");
+  // mySerial.println(coefficient[7]&0x000F);
   if ( crc4() != coefficient[7]&0x000F ) {
-    Serial.println("ERROR: ms5803 CRC check failed");
+    mySerial.println("ERROR: ms5803 CRC check failed");
   }
 
   return 0;
@@ -232,7 +234,7 @@ void pop_fn_and_call(void); // try duplicate prototype
 
 void MS5803::async_sendRead() {
   // this adds a bit of delay and fixes the
-  // Serial.println("sendRead called (from timer?)");
+  // mySerial.println("sendRead called (from timer?)");
 
   PRESS_WIRE.beginTransmission( _address );
   PRESS_WIRE.write(CMD_ADC_READ);
@@ -240,11 +242,11 @@ void MS5803::async_sendRead() {
 #ifdef ASYNC_I2C
   // unclear why this cast is necessary
   PRESS_WIRE.onTransmitDone(( void (*)(void) )pop_fn_and_call);
-  // Serial.println("async_sendRead() about to sendTransmission");
+  // mySerial.println("async_sendRead() about to sendTransmission");
   PRESS_WIRE.sendTransmission();
 #else
   PRESS_WIRE.endTransmission();
-  // Serial.println("async_sendRead => pop_fn_and_call");
+  // mySerial.println("async_sendRead => pop_fn_and_call");
   pop_fn_and_call();
 #endif
 }
@@ -256,7 +258,7 @@ void MS5803::async_getADC_temp()
   push_fn(this,(SensorFn)&MS5803::async_sendRead);
 
   async_conversion(TEMPERATURE+temp_precision);
-  // Serial.println("Issued temp conversion");
+  // mySerial.println("Issued temp conversion");
 }
 
 // Starts the chain of functions to ultimately get a new
@@ -271,7 +273,7 @@ void MS5803::async_getMeasurements(precision _temp_precision,precision _press_pr
   push_fn(this,(SensorFn)&MS5803::async_getADC_temp);
   push_fn(this,(SensorFn)&MS5803::async_getADC_press);
   // set this in motion
-  // Serial.println("async_getMeasurements => pop_fn_and_call");
+  // mySerial.println("async_getMeasurements => pop_fn_and_call");
   pop_fn_and_call();
 }
 
@@ -282,12 +284,12 @@ void MS5803::async_getADC_press(void)
   push_fn(this,(SensorFn)&MS5803::async_sendRead);
 
   async_conversion(PRESSURE+press_precision);
-  // Serial.println("Issued pressure conversion");
+  // mySerial.println("Issued pressure conversion");
 }
 
 void end_delay_and_pop() {
   sensorTimer.end();
-  // Serial.println("End delay and pop ISR => pop_fn_and_call");
+  // mySerial.println("End delay and pop ISR => pop_fn_and_call");
   pop_fn_and_call();
 }
 
@@ -310,14 +312,14 @@ void MS5803::async_conversion(uint8_t flags)
   // and then wait for 11ms.  But it's the 11ms that really holds things
   // up, so this should be a timed interrupt call instead of async i2c.
   uint32_t delay_ms=millis_for_flags(flags);
-  // Serial.println("About to start timer");
+  // mySerial.println("About to start timer");
 
   // this had been 100ms extra.  how about just 10ms extra?
   if ( ! sensorTimer.begin(end_delay_and_pop,1000*(10+delay_ms)) ) {
-    Serial.println("No timers available!");
+    mySerial.println("No timers available!");
   }
   
-  // Serial.println("end of async_conversion");
+  // mySerial.println("end of async_conversion");
 }
 
 void MS5803::async_request_three(void)
@@ -331,7 +333,7 @@ void MS5803::async_request_three(void)
   PRESS_WIRE.requestFrom(_address, 3);
   // next is async_readTemp or async_readPress -
   // I think it's safe to just drop into those directly
-  // Serial.println("async_request_three => pop_fn_and_call");
+  // mySerial.println("async_request_three => pop_fn_and_call");
   pop_fn_and_call();
 #endif
 }
@@ -354,7 +356,7 @@ void MS5803::async_readTemp(void)
   
   temperature_raw=((uint32_t)highByte << 16) + ((uint32_t)midByte << 8) + lowByte;
 
-  // Serial.println("async_readTemp => pop_fn_and_call");
+  // mySerial.println("async_readTemp => pop_fn_and_call");
   pop_fn_and_call();
 }
 
@@ -389,7 +391,7 @@ void MS5803::async_raw_to_actual(void)
 
   raw_to_actual();
 
-  // Serial.println("async_raw_to_actual => pop_fn_and_call");
+  // mySerial.println("async_raw_to_actual => pop_fn_and_call");
   pop_fn_and_call();
 }
 
@@ -437,12 +439,12 @@ void MS5803::sendCommand(uint8_t command)
   int status;
   PRESS_WIRE.beginTransmission( _address);
   status=PRESS_WIRE.write(command);
-  //Serial.print("ms5803 sendCommand: bytes=");
-  //Serial.println(status);
+  //mySerial.print("ms5803 sendCommand: bytes=");
+  //mySerial.println(status);
 
   status=PRESS_WIRE.endTransmission();
-  // Serial.print("ms5803 sendCommand: status=");
-  // Serial.println(status);
+  // mySerial.print("ms5803 sendCommand: status=");
+  // mySerial.println(status);
 }
 
 void MS5803::sensorWait(uint8_t time)

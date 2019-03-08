@@ -23,6 +23,8 @@
 // the highest speed supported by the board that is not over 4 MHz.
 // Change SPI_SPEED to SD_SCK_MHZ(50) for best performance.
 
+#include "serialmux.h"
+
 #include <SPI.h>
 #include <SdFat.h>
 
@@ -42,7 +44,8 @@ const int8_t DISABLE_CHIP_SELECT = -1;
 // Adafruit SD shields and modules: pin 10
 const uint8_t chipSelect = SD_PIN_CS;
 
-ArduinoOutStream cout(Serial);
+// Defined in serialmux.h/cpp
+// ArduinoOutStream cout(Serial);
 
 Sd2Card card; // for formatting
 
@@ -422,7 +425,7 @@ void Storage::format(char c) {
   // Soft spi options are configured in SdFat/SdFatConfig.h
   // RH: is this duplicating Storage::init() call to sd.begin()?
   if (!card.begin(SD_PIN_CS,SPI_SPEED)) {
-    Serial.print(
+    mySerial.print(
      "\nSD initialization failure!\n"
      "Is the SD card inserted correctly?\n"
      "Is chip select correct at the top of this sketch?\n");
@@ -432,9 +435,9 @@ void Storage::format(char c) {
   if (cardSizeBlocks == 0) sdError("cardSize");
   cardCapacityMB = (cardSizeBlocks + 2047)/2048;
 
-  Serial.print("Card Size: ");
-  Serial.print(cardCapacityMB);
-  Serial.println(" MB, (MB = 1,048,576 bytes)");
+  mySerial.print("Card Size: ");
+  mySerial.print(cardCapacityMB);
+  mySerial.println(" MB, (MB = 1,048,576 bytes)");
 
   if (c == 'E' || c == 'F') {
     eraseCard();

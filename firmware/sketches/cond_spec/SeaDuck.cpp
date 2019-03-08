@@ -3,6 +3,8 @@
 #include <AWire.h>
 #include <elapsedMillis.h>
 
+#include "serialmux.h"
+
 #include "SeaDuck.h"
 #include "SdFunctions.h"
 #include "Sensor.h"
@@ -63,14 +65,14 @@ Storage storage;
 #ifdef USE_TEENSY_ADC
 void check_adc_error() {
   if ( adc->adc1->fail_flag != ADC_ERROR_CLEAR ) {
-      Serial.print(" ADC1 error: ");
-      Serial.println(adc->adc1->fail_flag);
+      mySerial.print(" ADC1 error: ");
+      mySerial.println(adc->adc1->fail_flag);
       adc->adc1->fail_flag=ADC_ERROR_CLEAR;
       while(1);
   }
   if ( adc->adc0->fail_flag != ADC_ERROR_CLEAR ) {
-      Serial.print(" ADC0 error: ");
-      Serial.println(adc->adc0->fail_flag);
+      mySerial.print(" ADC0 error: ");
+      mySerial.println(adc->adc0->fail_flag);
       adc->adc0->fail_flag=ADC_ERROR_CLEAR;
       while(1);
   }
@@ -181,7 +183,7 @@ void SeaDuck::setup() {
   AWire.begin(); 
 #endif
   
-  Serial.println("# SeaDuck setup");
+  mySerial.println("# SeaDuck setup");
 
 #ifdef USE_TEENSY_ADC
   common_adc_init();
@@ -192,22 +194,26 @@ void SeaDuck::setup() {
 #endif
 
   for(int i=0;i<num_sensors;i++){
-    Serial.print("# ");
-    Serial.print(sensors[i]->name);
+    mySerial.print("# ");
+    mySerial.print(sensors[i]->name);
     sensors[i]->init();
-    Serial.println("   done");
+    mySerial.println("   done");
   }
 
   binary_format=BIN_HEX;
   storage.init();
-  Serial.println("# Storage init");
+  mySerial.println("# Storage init");
 
 #ifdef DOTSTAR_CLK
+  // this had been working, but after accidentally flashing it as a
+  // feather, then switching back to itsy bitsy m0, I can no longer turn
+  // the dotstar off?
   dotstar.begin();
+  dotstar.clear(); 
   dotstar.show();// turns off?
 #endif
   
-  Serial.println("# Checking for " CMDFILE);
+  mySerial.println("# Checking for " CMDFILE);
   activate_cmd_file(CMDFILE);
 }
 
@@ -226,7 +232,7 @@ void SeaDuck::dispatch_command() {
     if(cmd_arg) {
       sample_interval_us=atoi(cmd_arg);      
     }
-    Serial.print("interval_us="); Serial.println(sample_interval_us);
+    mySerial.print("interval_us="); mySerial.println(sample_interval_us);
   } else {
     Shell::dispatch_command();
   }
@@ -234,9 +240,9 @@ void SeaDuck::dispatch_command() {
 
 void SeaDuck::help() {
   Shell::help();
-  Serial.println("    sample # one-shot sampling");
-  Serial.println("    sample_loop # continuous sampling");
-  Serial.println("    interval_us[=NNNN] # sampling interval in usecs");
+  mySerial.println("    sample # one-shot sampling");
+  mySerial.println("    sample_loop # continuous sampling");
+  mySerial.println("    interval_us[=NNNN] # sampling interval in usecs");
   for(int i=0;i<num_sensors;i++ ) {
     sensors[i]->help();
   }
@@ -255,7 +261,7 @@ time_t SeaDuck::unixtime() {
 }
 
 void SeaDuck::write_header(void) {
-  Print *out=&Serial;
+  Print *out=&mySerial;
   
   if( storage.status==Storage::ENABLED ) {
     out=&storage;
@@ -284,7 +290,7 @@ void SeaDuck::oneshot_sample(void) {
 }
 
 void SeaDuck::async_output(void) {
-  Print *out=&Serial;
+  Print *out=&mySerial;
   
   if( storage.status==Storage::ENABLED ) {
     out=&storage;
@@ -296,8 +302,11 @@ void SeaDuck::async_output(void) {
     }
   }
   // probably this moves elsewhere to keep output from continuous sampling cleaner.
-  out->print("STOP\n"); 
-  out->flush();
+  // doesn't really seem necessary
+  // out->print("STOP\n");
+  // but newlines are nice
+  out->print("\n");
+  out->flush(); // BT Serial.flush() hangs, so that's disabled.
   pop_fn_and_call();
 }
 
@@ -318,7 +327,7 @@ void SeaDuck::async_oneshot(void) {
 
 void timer_isr(void) {
   if ( stack_size() > 0 ) {
-    Serial.println("Skipping timed sample because the stack is not empty");
+    mySerial.println("Skipping timed sample because the stack is not empty");
   } else {
     logger.async_oneshot();
   }
@@ -331,7 +340,13 @@ void SeaDuck::continuous_sample(void) {
   // start with data definition
   write_header();
 
-  Serial.println("# Starting interval timer loop");
+  for(int i=0;i<num_sensors;i++ ) {
+    if ( sensors[i]->enabled ) {
+      sensors[i]->enter_sample_loop();
+    }
+  }
+  
+  mySerial.println("# Starting interval timer loop");
   Timer.begin(timer_isr,sample_interval_us);
 
   while ( 1 ) {
@@ -345,8 +360,10 @@ void SeaDuck::continuous_sample(void) {
     storage.loop();
 
     // Allow stopping the loop on ! or ESC
-    if( Serial.available() ) {
-      uint8_t c=Serial.read();
+    // Serial.println("About to check for available input");
+    if( mySerial.available() ) {
+      // Serial.println("About to read available character");
+      uint8_t c=mySerial.read();
       // stop it when an exclamation or ESC is read
       if ( (c=='!') || (c==27) ) {
         break;
@@ -355,11 +372,18 @@ void SeaDuck::continuous_sample(void) {
   }
   Timer.end();
   while( stack_size() ) ; // let any currently running sampling code finish
+
+  for(int i=0;i<num_sensors;i++ ) {
+    if ( sensors[i]->enabled ) {
+      sensors[i]->exit_sample_loop();
+    }
+  }
+  
   storage.loop();
 
 #ifdef STATUS_LED
   digitalWrite(STATUS_LED,LOW);
 #endif
 
-  Serial.println("# Exiting interval timer loop. ");
+  mySerial.println("# Exiting interval timer loop. ");
 }

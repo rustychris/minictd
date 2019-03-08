@@ -1,6 +1,7 @@
 #include "cfg_seaduck.h"
 #ifdef HAS_MOTOR
 
+#include "serialmux.h"
 #include "motor.h"
 
 void Motor::init() {
@@ -93,7 +94,7 @@ void Motor::read_current(int motor){
     a_sense=analogRead(MOTOR_ASENSE) - a_sense_offset;
     a_current=a_decay*a_current + (1-a_decay)*a_sense*3.3/4096.0/MOTOR_ASENSE_R;
     if (  (a_status&(MOTOR_FWD|MOTOR_REV)) && (a_current<a_current_threshold) ) {
-      Serial.println("LIMIT"); // temporary
+      mySerial.println("LIMIT"); // temporary
       a_status |= MOTOR_LIMIT;
     }
   }
@@ -101,7 +102,7 @@ void Motor::read_current(int motor){
     b_sense=analogRead(MOTOR_BSENSE) - b_sense_offset;
     b_current=b_decay*b_current + (1-b_decay)*b_sense*3.3/4096.0/MOTOR_BSENSE_R;
     if ( (b_status&(MOTOR_FWD|MOTOR_REV)) && (b_current<b_current_threshold) ) {
-      Serial.println("LIMIT"); // temporary
+      mySerial.println("LIMIT"); // temporary
       b_status |= MOTOR_LIMIT;
     }
   }
@@ -109,39 +110,36 @@ void Motor::read_current(int motor){
 
 void Motor::display(unsigned int select) {
   if( select & DISP_ENABLE ) {
-    Serial.print("motor_enable="); Serial.println( enabled );
+    mySerial.print("motor_enable="); mySerial.println( enabled );
   }
 
   if( (a_status!=MOTOR_OFF) || (select&DISP_OFF) ) {
     read_current(MOTOR_A);
-    if(select & DISP_SENSE ) {
-      Serial.print("motor_a_sense="); Serial.println(a_sense);
-    }
-    if(select & DISP_SENSE ) {
-      Serial.print("motor_a_sense="); Serial.println(a_sense);
+    if(select&DISP_SENSE ) {
+      mySerial.print("motor_a_sense="); mySerial.println(a_sense);
     }
     if(select&DISP_CURRENT) {
-      Serial.print("motor_a_current="); Serial.println(a_current,3);
+      mySerial.print("motor_a_current="); mySerial.println(a_current,3);
     }
-    Serial.print("motor_a_status=");
-    if( a_status&MOTOR_FWD ) Serial.print(" FWD");
-    if( a_status&MOTOR_REV ) Serial.print(" REV");
-    if( a_status&MOTOR_LIMIT ) Serial.print(" LIMIT");
-    Serial.println();
+    mySerial.print("motor_a_status=");
+    if( a_status&MOTOR_FWD ) mySerial.print(" FWD");
+    if( a_status&MOTOR_REV ) mySerial.print(" REV");
+    if( a_status&MOTOR_LIMIT ) mySerial.print(" LIMIT");
+    mySerial.println();
   }
   if( (b_status!=MOTOR_OFF) || (select&DISP_OFF) ) {
     read_current(MOTOR_B);
     if(select & DISP_SENSE ) {
-      Serial.print("motor_b_sense="); Serial.println(b_sense);
+      mySerial.print("motor_b_sense="); mySerial.println(b_sense);
     }
     if(select&DISP_CURRENT) {
-      Serial.print("motor_b_current="); Serial.println(b_current,3);
+      mySerial.print("motor_b_current="); mySerial.println(b_current,3);
     }
-    Serial.print("motor_b_status=");
-    if( b_status&MOTOR_FWD ) Serial.print(" FWD");
-    if( b_status&MOTOR_REV ) Serial.print(" REV");
-    if( b_status&MOTOR_LIMIT ) Serial.print(" LIMIT");
-    Serial.println();
+    mySerial.print("motor_b_status=");
+    if( b_status&MOTOR_FWD ) mySerial.print(" FWD");
+    if( b_status&MOTOR_REV ) mySerial.print(" REV");
+    if( b_status&MOTOR_LIMIT ) mySerial.print(" LIMIT");
+    mySerial.println();
   }
 }
 
@@ -149,27 +147,37 @@ int Motor::wait_and_stop() {
   int condition=0;
   
   // flush input buffer, then stop on any input
-  while(Serial.available() ) { Serial.read(); }
+  while(mySerial.available() ) { mySerial.read(); }
+
+  // Prop up the motor current so the lowpass has a chance to catch up
+  if (a_status&(MOTOR_FWD|MOTOR_REV)) {
+    mySerial.println("# Padding up motor A current");
+    a_current=10*a_current_threshold;
+  }
+  if (b_status&(MOTOR_FWD|MOTOR_REV)) {
+    mySerial.println("# Padding up motor B current");
+    b_current=10*b_current_threshold;
+  }
 
   while(1) {
-    if( Serial.available() ) {
-      uint8_t c=Serial.read();
+    if( mySerial.available() ) {
+      uint8_t c=mySerial.read();
       break;
     } else {
       display(DISP_CURRENT);
       // that gets us fresh limit status
       if(a_status&MOTOR_LIMIT) {
-        Serial.println("# Motor A detected limit switch");
+        mySerial.println("# Motor A detected limit switch");
         command(MOTOR_A,MOTOR_OFF);
         condition=MOTOR_LIMIT;
       }
       if(b_status&MOTOR_LIMIT) {
-        Serial.println("# Motor B detected limit switch");
+        mySerial.println("# Motor B detected limit switch");
         command(MOTOR_B,MOTOR_OFF);
         condition=MOTOR_LIMIT;
       }
       if( (a_status==MOTOR_OFF) && (b_status==MOTOR_OFF) ){
-        Serial.println("# All motors off");
+        mySerial.println("# All motors off");
         break;
       }
       delay(40);
@@ -183,25 +191,25 @@ bool Motor::dispatch_command(const char *cmd, const char *cmd_arg) {
   if ( !strcmp(cmd,"motor") ) {
     display();
   } else if(!strcmp(cmd,"motor_a_fwd")) {
-    if ( !enabled ){ Serial.println("Motor is not enabled"); }
+    if ( !enabled ){ mySerial.println("Motor is not enabled"); }
     else {
       command(MOTOR_A,MOTOR_FWD);
       wait_and_stop();
     }
   } else if(!strcmp(cmd,"motor_a_rev")) {
-    if ( !enabled ){ Serial.println("Motor is not enabled"); }
+    if ( !enabled ){ mySerial.println("Motor is not enabled"); }
     else {
       command(MOTOR_A,MOTOR_REV);
       wait_and_stop();
     }
   } else if(!strcmp(cmd,"motor_b_fwd")) {
-    if ( !enabled ){ Serial.println("Motor is not enabled"); }
+    if ( !enabled ){ mySerial.println("Motor is not enabled"); }
     else {
       command(MOTOR_B,MOTOR_FWD);
       wait_and_stop();
     }
   } else if(!strcmp(cmd,"motor_b_rev")) {
-    if ( !enabled ) { Serial.println("Motor is not enabled"); }
+    if ( !enabled ) { mySerial.println("Motor is not enabled"); }
     else {
       command(MOTOR_B,MOTOR_REV);
       wait_and_stop();
@@ -216,7 +224,7 @@ bool Motor::dispatch_command(const char *cmd, const char *cmd_arg) {
         disable();
       }
     } else {
-      Serial.print("motor_enable="); Serial.println( enabled );
+      mySerial.print("motor_enable="); mySerial.println( enabled );
     }
   } else {
     return false;
@@ -226,15 +234,15 @@ bool Motor::dispatch_command(const char *cmd, const char *cmd_arg) {
 
 
 void Motor::help() {
-  Serial.println("  Motor");
-  Serial.println("    motor               # report sense and drive");
-  Serial.println("    motor_enable        # report motor enable status");
-  Serial.println("    motor_enable=[0,1]  # disarm/arm motor");
-  Serial.println("    motor_off           # all motors off");
-  Serial.println("    motor_a_fwd         # motor A forward until keypress");
-  Serial.println("    motor_a_rev         # motor A reverse until keypress");
-  Serial.println("    motor_b_fwd         # motor B forward until keypress");
-  Serial.println("    motor_b_rev         # motor B reverse until keypress");
+  mySerial.println("  Motor");
+  mySerial.println("    motor               # report sense and drive");
+  mySerial.println("    motor_enable        # report motor enable status");
+  mySerial.println("    motor_enable=[0,1]  # disarm/arm motor");
+  mySerial.println("    motor_off           # all motors off");
+  mySerial.println("    motor_a_fwd         # motor A forward until keypress");
+  mySerial.println("    motor_a_rev         # motor A reverse until keypress");
+  mySerial.println("    motor_b_fwd         # motor B forward until keypress");
+  mySerial.println("    motor_b_rev         # motor B reverse until keypress");
 }
   
 void Motor::write_frame_info(Print &out) {

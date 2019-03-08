@@ -2,6 +2,7 @@
 #include "cfg_seaduck.h"
 #ifdef HAS_PRESSURE
 
+#include "serialmux.h"
 #include "pressure.h"
 #include "ms5803.h"
 
@@ -40,14 +41,14 @@ void Pressure::async_copyValues() {
 void Pressure::display(){
   read();
   
-  Serial.print("temp_ms5803=");
-  Serial.println(temperature_c100 / 100.0f);
+  mySerial.print("temp_ms5803=");
+  mySerial.println(temperature_c100 / 100.0f);
   
-  Serial.print("press_abs_mbar=");
-  Serial.println(pressure_abs_dPa / 10.0f);
+  mySerial.print("press_abs_mbar=");
+  mySerial.println(pressure_abs_dPa / 10.0f);
      
-  Serial.print("press_delta_dbar=");
-  Serial.println( ( (pressure_abs_dPa-pressure_baseline_dPa)/1000.0f ) ); 
+  mySerial.print("press_delta_dbar=");
+  mySerial.println( ( (pressure_abs_dPa-pressure_baseline_dPa)/1000.0f ) ); 
 }
 
 bool Pressure::dispatch_command(const char *cmd, const char *cmd_arg) {
@@ -57,7 +58,7 @@ bool Pressure::dispatch_command(const char *cmd, const char *cmd_arg) {
     if(cmd_arg) {
       enabled=(bool)atoi(cmd_arg);
     } else {
-      Serial.print("pressure_enable="); Serial.println( enabled );
+      mySerial.print("pressure_enable="); mySerial.println( enabled );
     }
   } else {
     return false;
@@ -66,9 +67,9 @@ bool Pressure::dispatch_command(const char *cmd, const char *cmd_arg) {
 }
 
 void Pressure::help() {
-  Serial.println("  Pressure");
-  Serial.println("    pressure  # report temp and pressure");
-  Serial.println("    pressure_enable[=0,1] # enable/disable ");
+  mySerial.println("  Pressure");
+  mySerial.println("    pressure  # report temp and pressure");
+  mySerial.println("    pressure_enable[=0,1] # enable/disable ");
 }
 
   

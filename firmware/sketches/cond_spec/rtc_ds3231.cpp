@@ -2,6 +2,8 @@
 
 #ifdef HAS_RTC_DS3231
 
+#include "serialmux.h"
+
 #include <TimeLib.h>
 
 #include "SeaDuck.h"
@@ -69,7 +71,7 @@ void RTC_DS3231::set_datetime(const char *str) {
   // format is YYYY-MM-DDTHH:MM:SS
   // where the date/time separator is arbitrary (T, space, _, etc.)
   if( strlen(str) != strlen("YYYY-MM-DD HH:MM:SS") ) {
-    Serial.println("Error: format is YYYY-MM-DD HH:MM:SS");
+    mySerial.println("Error: format is YYYY-MM-DD HH:MM:SS");
     return;
   }
 
@@ -96,7 +98,7 @@ bool RTC_DS3231::dispatch_command(const char *cmd, const char *cmd_arg) {
     if(cmd_arg) {
       enabled=(bool)atoi(cmd_arg);
     } else {
-      Serial.print("rtc_enable="); Serial.println( enabled );
+      mySerial.print("rtc_enable="); mySerial.println( enabled );
     }
   } else {
     return false;
@@ -105,19 +107,19 @@ bool RTC_DS3231::dispatch_command(const char *cmd, const char *cmd_arg) {
 }
 
 void RTC_DS3231::help(void) {
-  Serial.println("  Real time clock");
-  Serial.println("    rtc_status       # print current time in seconds");
-  Serial.println("    rtc_watch        # check incrementing of RTC");
-  Serial.println("    rtc_datetime=YYYY-MM-DD HH:MM:SS # set clock");
-  Serial.println("    rtc_enable[=0,1] # enable/disable ");
+  mySerial.println("  Real time clock");
+  mySerial.println("    rtc_status       # print current time in seconds");
+  mySerial.println("    rtc_watch        # check incrementing of RTC");
+  mySerial.println("    rtc_datetime=YYYY-MM-DD HH:MM:SS # set clock");
+  mySerial.println("    rtc_enable[=0,1] # enable/disable ");
   
 }
 
 void printDigits(int digits) {
  // utility function for digital clock display: prints preceding colon and leading 0
  if (digits < 10)
-   Serial.print('0');
- Serial.print(digits);
+   mySerial.print('0');
+ mySerial.print(digits);
 }
 
 void RTC_DS3231::status() {
@@ -125,32 +127,32 @@ void RTC_DS3231::status() {
 
   read();
 
-  Serial.print("seconds=");
-  Serial.println(reading_seconds);
+  mySerial.print("seconds=");
+  mySerial.println(reading_seconds);
 
   DateTime now(reading_seconds); 
-  Serial.print("datetime=");
+  mySerial.print("datetime=");
   print_date(now);
 }
 
 void print_date(DateTime &dt) {
-  Serial.print(dt.year());
-  Serial.print("-");
+  mySerial.print(dt.year());
+  mySerial.print("-");
   printDigits(dt.month());
-  Serial.print("-");
+  mySerial.print("-");
   printDigits(dt.day());
 
-  Serial.print(" ");
+  mySerial.print(" ");
   printDigits(dt.hour());
-  Serial.print(":");
+  mySerial.print(":");
   printDigits(dt.minute());
-  Serial.print(":");
+  mySerial.print(":");
   printDigits(dt.second());
-  Serial.println();
+  mySerial.println();
 }
 
 void RTC_DS3231::watch() {
-  Serial.println("Looping 100+ millis:");
+  mySerial.println("Looping 100+ millis:");
   for(int i=0;i<30;i++) {
     status();
     delay(100);

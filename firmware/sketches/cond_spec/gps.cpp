@@ -4,7 +4,11 @@
 #include <Arduino.h>
 
 #include "gps.h"
+#include "serialmux.h"
 
+#ifdef BT2S
+# error Bluetooth serial cannot coexist with GPS
+#endif
 // Getting serial interrupts requires adding this to variant.cpp in place
 // of the existing SERCOM0_Handler()
 //    void Serial1_callback() __attribute__((weak)); // RH
@@ -32,7 +36,6 @@ void GPS::init(void){
 
 void GPS::async_read(void) {
   // this is always going in the background.
-  // Serial.println("GPS async_read not implemented");
   pop_fn_and_call();
 }
 
@@ -53,8 +56,8 @@ void GPS::watch(void) {
 
     // With interrupt handler, should see them here
     while(read_sentence!=write_sentence) {
-      Serial.print("NMEA=");
-      Serial.print(sentence_buff[read_sentence]); // has its own newline, I think
+      mySerial.print("NMEA=");
+      mySerial.print(sentence_buff[read_sentence]); // has its own newline, I think
       read_sentence=(read_sentence+1)%MAX_NMEA_SENTENCES;
     }
 
@@ -67,7 +70,7 @@ void GPS::watch(void) {
       } 
     }
   }
-  Serial.println("# Exiting gps watch loop. ");
+  mySerial.println("# Exiting gps watch loop. ");
 }
 
 void GPS::record_byte(char c) {
@@ -98,7 +101,7 @@ void GPS::record_byte(char c) {
       write_sentence=(write_sentence+1)%MAX_NMEA_SENTENCES;
       write_char=0;
       if ( read_sentence==write_sentence ) {
-        // Serial.println("Write overrun");
+        // mySerial.println("Write overrun");
         // the write pointer has overtaken the read pointer.
         // favor new data over old, so we bump the read pointer
         // TODO: Check for race conditions
@@ -118,7 +121,7 @@ bool GPS::dispatch_command(const char *cmd, const char *cmd_arg) {
     if(cmd_arg) {
       enabled=(bool)atoi(cmd_arg);
     } else {
-      Serial.print("gps_enable="); Serial.println( enabled );
+      mySerial.print("gps_enable="); mySerial.println( enabled );
     }
   } else {
     return false;
@@ -127,9 +130,9 @@ bool GPS::dispatch_command(const char *cmd, const char *cmd_arg) {
 }
 
 void GPS::help(void) {
-  Serial.println("  GPS");
-  Serial.println("    gps_watch        # stream GPS serial data");
-  Serial.println("    gps_enable[=0,1] # enable/disable logging of gps");
+  mySerial.println("  GPS");
+  mySerial.println("    gps_watch        # stream GPS serial data");
+  mySerial.println("    gps_enable[=0,1] # enable/disable logging of gps");
 }
 
 #define XSTR(s) STR(s)

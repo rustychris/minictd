@@ -30,12 +30,18 @@ public:
   virtual void help(){};
   virtual void write_frame_info(Print &out){};
   virtual void write_data(Print &out){};
+  // called just before the sampling loop starts
+  virtual void enter_sample_loop(void) {};
+  // called when the sampling loop exits.  All async tasks will be completed,
+  // but storage has not been finalized, so a small amount of additional data
+  // can be written.
+  virtual void exit_sample_loop(void) {};
 
   volatile int busy;
   void clear_busy(void);
   void push_busy(void);
   
-  bool enabled;
+  volatile bool enabled;
 };
 
 typedef enum { BIN_HEX, BIN_RAW } binary_format_t;
