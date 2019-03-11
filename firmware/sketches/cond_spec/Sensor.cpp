@@ -43,14 +43,15 @@ void write_base16(Print &out,uint8_t *buff,int count)
 {
   static uint8_t hexbuff[HEX_CHAR_PER_LINE];
 
-  int i=0;
-  int pos=0;
+  int i=0; // tracks index into buff.
+  int pos=0; // tracks next index into hexbuff
 
   if( binary_format==BIN_HEX) {
     for(;i<count;i++) {
       hexbuff[pos]  =hexmap[ (buff[i]>>4) & 0xF ];
       hexbuff[pos+1]=hexmap[  buff[i]     & 0xF ];
       pos+=2;
+      // wrap lines
       if( pos == HEX_CHAR_PER_LINE-1 ) {
         hexbuff[pos]='\n';
         out.write(hexbuff,HEX_CHAR_PER_LINE);
@@ -60,7 +61,7 @@ void write_base16(Print &out,uint8_t *buff,int count)
     if( pos > 0 ){
       // avoid so many newlines
       // hexbuff[pos]='\n';
-      out.write(hexbuff,pos+1);
+      out.write(hexbuff,pos);
     }
   } else {
     out.write(buff,count);

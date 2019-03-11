@@ -158,7 +158,9 @@ void GPS::write_data(Print &out) {
   interrupts();
   
   while(read_sentence!=write_sentence_copy) {
-    write_base16(out,(uint8_t*)&sentence_buff[read_sentence],MAX_SENTENCE_LENGTH);
+    // This used to have &sentence_buff[read_sentence], but that seems
+    // unnecessary?
+    write_base16(out,(uint8_t*)sentence_buff[read_sentence],MAX_SENTENCE_LENGTH);
     memset((void*)(&sentence_buff[read_sentence]),0,MAX_SENTENCE_LENGTH);
     
     // TODO: double check for race conditions with writer.
