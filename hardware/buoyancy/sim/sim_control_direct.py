@@ -1,5 +1,6 @@
 """
 Simulate vertical motion of drifter and effect of controller
+ - sim_control_direct.py: control variable is piston position
 """
 
 import matplotlib.pyplot as plt
@@ -40,8 +41,11 @@ class Drifter(object):
     # 10-32 rod, 25rpm, 6mm / ml syring
     # 25/60. rev/s * 0.8 mm/rev => 0.33 mm/s
     # 0.33 mm/s /(6mm/ml) => 0.055ml/s
-
+    
+    # control_mode='direct': plunger_cmd is the plunger position in ml
+    # otherwise the percent power to apply to the motorn
     plunger_cmd=0.0
+    
     plunger_rate=0.055 * 1e-6 # cc/s * m3/cc ~ m3/s
     plunger_max_volume=5 * 1e-6 # 5ml
     plunger_volume=0.0 # fully out
@@ -56,17 +60,30 @@ class Drifter(object):
     a_est=0.0 # estimated acceleration
     w_est=0.0 # estimated velocity from "pressure"
     z_est=0.0 # estimate vertical position
+    err_int=0.0 # integration of error
     
     z_last=0.0 # for w_est
     w_last=0.0 # for a_est
+
+    # Terms in the PID[A] controller
+    prop=0.0
+    deriv=0.0
+    integ=0.0
+    accel=0.0
     
+    rate_int=50.0 # [1/s], 0 to disable
     T_deriv=60.0 # s.  Time constant for derivative term
     T_accel=0.0 # s2
     P=1.0 # scale for proportional term
     
     state_dtype=[('t_sec',np.float64),
                  ('z',np.float64),
+                 ('z_set',np.float64),
                  ('plunger_volume',np.float64),
+                 ('prop', np.float64),
+                 ('deriv',np.float64),
+                 ('accel',np.float64),
+                 ('integ',np.float64),
                  ('w',np.float64),
                  ('w_est',np.float64),
                  ('a_est',np.float64),
@@ -140,30 +157,52 @@ class Drifter(object):
         self.update_z_buoyancy_drag()
         self.t_sec+=self.dt
 
+    control_mode='direct_limited' # direct, binary, proportional
+    
     def update_control(self):
         """
         Compare z and setpoint, decide whether to move plunger
         """
         self.update_w_est()
-        # prop/deriv
-        prop=self.P*(self.z-self.z_set)
-        deriv=self.w_est
-        PDA=prop + deriv*self.T_deriv + self.a_est*self.T_accel
 
-        if 0: # binary control
-            if PDA>self.deadband:
+        # should the prop term use z_est, or z?
+        err=self.z_est-self.z_set
+        
+        self.prop=self.P*err
+        self.deriv=self.T_deriv*self.w_est
+        self.accel=self.T_accel*self.a_est
+        self.integ+=err*self.dt_control*self.rate_int
+
+        ctrl=self.prop + self.deriv + self.accel + self.integ
+
+        if self.control_mode=='binary':
+            if ctrl>self.deadband:
                 self.plunger_cmd=1.0  # increase plunger volume
-            elif PDA<-self.deadband:
+            elif ctrl<-self.deadband:
                 self.plunger_cmd=-1.0 # decrease plunger volume
             else:
                 self.plunger_cmd=0.0
-        if 1: # proportional
-            self.plunger_cmd=np.interp(PDA,
+        if self.control_mode=='proportional':
+            self.plunger_cmd=np.interp(ctrl,
                                        [-self.deadband,self.deadband],
                                        [-1,1])
+        if self.control_mode in ['direct','direct_limited']:
+            # plunger cmd is in ml
+            if np.abs(ctrl-self.plunger_cmd)>self.deadband:
+                self.plunger_cmd=ctrl
             
     def update_plunger(self):
-        self.plunger_volume+=self.dt*self.plunger_cmd*self.plunger_rate
+        if self.control_mode in ['binary','proportional']:
+            self.plunger_volume+=self.dt*self.plunger_cmd*self.plunger_rate
+        if self.control_mode=='direct':
+            self.plunger_volume=self.plunger_cmd/1e6
+        if self.control_mode=='direct_limited':
+            req_change=self.plunger_cmd/1e6-self.plunger_volume
+            real_change=np.clip(req_change,
+                                -self.dt*self.plunger_rate,
+                                self.dt*self.plunger_rate)
+            self.plunger_volume+=real_change
+            
         self.plunger_volume=np.clip(self.plunger_volume,0,self.plunger_max_volume)
         
     def update_z_turb(self):
@@ -247,29 +286,33 @@ class Drifter(object):
                   self.state['z'],label='z')
         ax_z.plot(self.state['t_sec']-self.T_w_est/4.,
                   self.state['z_est'],label='z est lag')
+        ax_z.plot(self.state['t_sec'],
+                  self.state['z_set'],label='z set',lw=1.5,zorder=-2,color='0.7')
         ax_z.axis(ymin=self.z_bed,ymax=self.z_eta+0.02)
+        ax_z.legend(fontsize=9)
 
-        ax_hist=fig.add_subplot(gs[0,-1])
+        ax_hist=fig.add_subplot(gs[0,-1],sharey=ax_z)
         ax_hist.hist(self.state['z'],np.linspace(self.z_bed,self.z_eta,100),
                      orientation='horizontal')
+        plt.setp(ax_hist.get_yticklabels(),visible=0)
 
         ax_ctrl=fig.add_subplot(gs[1,:-1],sharex=ax_z)
         ax_ctrl.plot(self.state['t_sec'],
                      1e6*self.state['plunger_volume'],
                      label='plunge V (mL)')
-        ax_ctrl.plot(self.state['t_sec'],
-                     50*self.state['w_est'],
-                     label='100x w est.')
-        ax_ctrl.plot(self.state['t_sec'],
-                     200*self.state['a_est'],
-                     label='500x a est.')
-        
-        ax_ctrl.legend(fontsize=8)
+        ax_ctrl.plot(self.state['t_sec'],self.state['prop'],label='P')
+        ax_ctrl.plot(self.state['t_sec'],self.state['integ'],label='I')
+        ax_ctrl.plot(self.state['t_sec'],self.state['deriv'],label='D')
+        ax_ctrl.plot(self.state['t_sec'],self.state['accel'],label='A')
+
+        ax_ctrl.legend(fontsize=8,loc='upper left',bbox_to_anchor=[1.05,1.])
         ax_ctrl.set_xlabel('seconds')
         ax_ctrl.set_ylabel('Plunger V (ml)')
-
+        plt.setp(ax_z.get_xticklabels(),visible=0)
+        
         ax_z.set_ylabel('Depth (m)')
-        fig.subplots_adjust(left=0.12,wspace=0.55)
+
+        fig.subplots_adjust(left=0.12,wspace=0.25,hspace=0.1)
         return fig
 #sim=Drifter(z_set=-2.0,Cd=2.0,T_deriv=10,u_star=0.005,T_w_est=1.0)
 #sim=Drifter(z_set=-2.0,Cd=2.0,T_deriv=60,u_star=0.01,T_w_est=1.0)
@@ -277,13 +320,28 @@ class Drifter(object):
 # T_deriv=10, T_accel=100, T_w_est=20. is not bad, still small
 # oscillations.
 
+
+
+# rate limited
 sim=Drifter(z_set=-0.10,Cd=0.15,
-            P=1.,T_deriv=50,T_accel=0,
-            u_star=0.001,T_w_est=10.0,
+            P=3.2,T_deriv=19,T_accel=2.0,rate_int=0.12,
+            control_mode='direct_limited',
+            u_star=0.01,T_w_est=10.0,
+            z_bed=-0.20,dt=0.1,
+            deadband=0.00)
+sim.integrate(600)
+sim.plot(3)
+
+## 
+# using z_est for all control, no turbulence:
+sim=Drifter(z_set=-0.10,Cd=0.15,
+            P=9,T_deriv=30,T_accel=10.0,rate_int=0.3,
+            control_mode='direct',
+            u_star=0.00,T_w_est=10.0,
             z_bed=-0.20,dt=0.1,
             deadband=0.03)
 sim.integrate(600)
-sim.plot(4)
+sim.plot(2)
 
 # butter at 20.0 second cutoff introduces about 5 second lag.
 
