@@ -75,6 +75,10 @@ class Drifter(object):
     T_deriv=60.0 # s.  Time constant for derivative term
     T_accel=0.0 # s2
     P=1.0 # scale for proportional term
+
+    # when the depth is above this fraction of the way between the surface
+    # and set point, go full negative
+    transit_fraction=0.3
     
     state_dtype=[('t_sec',np.float64),
                  ('z',np.float64),
@@ -164,10 +168,10 @@ class Drifter(object):
         Compare z and setpoint, decide whether to move plunger
         """
         self.update_w_est()
-
+        
         # should the prop term use z_est, or z?
         err=self.z_est-self.z_set
-        
+            
         self.prop=self.P*err
         self.deriv=self.T_deriv*self.w_est
         self.accel=self.T_accel*self.a_est
@@ -187,10 +191,20 @@ class Drifter(object):
                                        [-self.deadband,self.deadband],
                                        [-1,1])
         if self.control_mode in ['direct','direct_limited']:
-            # plunger cmd is in ml
-            if np.abs(ctrl-self.plunger_cmd)>self.deadband:
-                self.plunger_cmd=ctrl
-            
+            in_transit=self.z_est/self.z_set < self.transit_fraction
+            if in_transit:
+                # use the integral term to remember the plunger volume needed to
+                # get off the surface
+                # it seems like deriv should be subtracted -- not sure why
+                # but it appears to create less of an initial overshot if deriv is
+                # added in (it would be negative here, so really it's decreasing
+                # integ).
+                self.integ=self.plunger_volume*1e6 - self.prop + self.deriv 
+                self.plunger_cmd=100. # max neg.
+            else:            
+                if np.abs(ctrl-self.plunger_cmd)>self.deadband:
+                    self.plunger_cmd=ctrl
+
     def update_plunger(self):
         if self.control_mode in ['binary','proportional']:
             self.plunger_volume+=self.dt*self.plunger_cmd*self.plunger_rate
@@ -320,17 +334,28 @@ class Drifter(object):
 # T_deriv=10, T_accel=100, T_w_est=20. is not bad, still small
 # oscillations.
 
+# with transit_fraction=0.1
+sim=Drifter(z_set=-0.10,Cd=0.15,
+            P=3.2,T_deriv=19,T_accel=2.0,rate_int=0.12,
+            control_mode='direct_limited',transit_fraction=0.1,
+            u_star=0.0,T_w_est=10.0,
+            z_bed=-0.20,dt=0.1,
+            deadband=0.00)
+sim.integrate(500)
+sim.plot(3)
 
 
+## 
+# with transit_fraction=0.0, 200-280s to first reach depth.
 # rate limited
 sim=Drifter(z_set=-0.10,Cd=0.15,
             P=3.2,T_deriv=19,T_accel=2.0,rate_int=0.12,
-            control_mode='direct_limited',
+            control_mode='direct_limited',transit_fraction=-100.0,
             u_star=0.01,T_w_est=10.0,
             z_bed=-0.20,dt=0.1,
             deadband=0.00)
-sim.integrate(600)
-sim.plot(3)
+sim.integrate(3000)
+sim.plot(4)
 
 ## 
 # using z_est for all control, no turbulence:
