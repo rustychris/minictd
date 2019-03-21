@@ -69,6 +69,25 @@ const char *state_labels[]={"DISABLED",
                             "RETURN"};
 
 void Buoyancy::init() {
+  // set butterworth coefficients
+  // calculated offline from this:
+  // f_samp_Hz=(1./self.dt_control)
+  // f_nyq_Hz=f_samp_Hz/2.0
+  // f_cut_Hz=1./self.T_w_est
+        
+  // B,A = butter(2, # second order
+  //              f_cut_Hz/f_nyq_Hz, # normalized [0,1] cutoff, relative to nyquist
+  //             )
+  // with dt_control=0.1 (s), T_w_est=10.0 (s)
+
+  lpA[0]=1.0f;
+  lpA[1]=-1.91119707f;
+  lpA[2]=0.91497583f;
+  lpB[0]=0.00094469f;
+  lpB[1]=0.00188938f;
+  lpB[2]=0.00094469f;
+  lpx[0]=lpx[1]=lpx[2]=0.0f;
+  lpy[0]=lpy[1]=lpy[2]=0.0f;
 }
 
 void Buoyancy::disable(void){
@@ -77,6 +96,28 @@ void Buoyancy::disable(void){
 
 void Buoyancy::enable(void) {
   enabled=true;
+}
+
+void Buoyancy::update_z(void) {
+  // dPa ~ mm, convert to m, positive up. 0 at surface
+  float z_inst=(atm_press_dPa - pressure.pressure_abs_dPa)/1000.0f;
+
+  // butterworth lowpass
+  // B: numerator
+  // A: denominator
+  lpx[2]=lpx[1];
+  lpx[1]=lpx[0];
+  lpx[0]=z_inst;
+  lpy[2]=lpy[1];
+  lpy[1]=lpy[0];
+
+  lpy[0]=1./lpA[0]*(lpB[0]*lpx[0] + lpB[1]*lpx[1] + lpB[2]*lpx[2]
+                    -lpA[1]*lpy[1] - lpA[2]*lpy[2]);
+  
+  // w_est=(lpy[0]-lpy[1])/dt_control;
+  // a_est=(lpy[0]-2*lpy[1]+lpy[2])/(dt_control*dt_control);
+  // z_est=lpy[0];
+  // z_instant=lpx[0];
 }
 
 void Buoyancy::enter_sample_loop(void) {
@@ -122,61 +163,71 @@ void Buoyancy::async_read() {
   }
 
   // Otherwise we're in the control loop
-  
-  // Update w estimatte
-  float w_instant;
 
-  // from pressure.cpp --
-  //  mbar is dPa/10
-  //  bar is 100 kPa, so mbar 100Pa
-  //  and dPa would then be 10Pa, so decaPascals.
-  
-  // so the raw readings are potentially mm of water.
-  // assuming 'actual' readings are in decaPascals,
-  // scale that by 1000, and 
-  
-  // 1000*dPa / ms, approx mm/s
-  // May need further scaling to get the right resolution.
+  // Update the lowpass vertical estimates.
+  update_z();
 
-  // mm/ms ~ m/s
+  // lpy[0] has the current lowpass vertical position, positive up.
+  // lpy[1] and lpy[2] have the two previous estimates
+  // these are all meters.
+
   long dt_ms=since_last;
   since_last=0;
+
+  // m * ms/s / ms
+  w_mps=(lpy[0]-lpy[1])*1000.0f/dt_ms;
   
-  w_instant=(pressure_last_dPa - pressure.pressure_abs_dPa);
-  w_instant /= dt_ms;
-
-  // T_lowpass convert to ms, 
-  float alpha=dt_ms/(1000*T_lowpass);
-
-  if (alpha<1.0) {
-    w_mps=alpha*w_instant + (1-alpha)*w_mps;
-  } else {
-    w_mps=w_instant;
-  }
-
-  pressure_last_dPa=pressure.pressure_abs_dPa;
-
   // CONTROL
   // Current depth, positive up
-  float z_m=(atm_press_dPa-pressure_last_dPa)/1000.0;
-  float prop=z_m+depth_target; // depth_target is positive down
-  //   depth error   +   derivative term
-  float PD=prop + w_mps*T_deriv;
+  float z_m=lpx[0];
+  // instantaneous error used for proportional and integral values
+  float err=z_m+depth_target; // depth_target is positive down
 
-  mySerial.print("# w_instant=");
-  mySerial.print(w_instant,4);
+  ctrl_prop=G_prop*err;
+  ctrl_integ+=err*dt_ms*R_integ/1000.f;
+  ctrl_deriv=T_deriv*w_mps;
+
+  // the requested piston water volume
+  float ctrl=ctrl_prop+ctrl_integ+ctrl_deriv;
+
   mySerial.print("  w_mps=");
   mySerial.print(w_mps,6);
   mySerial.print("  z=");
   mySerial.print(z_m,4);
 
-  if(PD>deadband) { // above target
+  if ( -z_m/depth_target < transit_fraction ) {
+    // back-calculate what the integral term would be to
+    // keep going, so that when we submerge below
+    // transit fraction it's like the integral term has
+    // been wound-up just the right amount.  need a better
+    // explanation than that.
+
+    // on paper this should also subtract the ctrl_deriv,
+    // but in simulation results were slightly better with adding
+    // ctrl_deriv.
+    //                 ms            ml/s           s/ms
+    float piston_ml=motor.position(BUOY_MTR_SEL)*PISTON_RATE * 0.0001f;
+    ctrl_integ=piston_ml - ctrl_prop + ctrl_deriv;
+    ctrl=BUOY_PISTON_ML; // max neg.
+  } 
+
+  // ctrl is target volume of water in piston in ml
+  // convert to position in ms
+  long position_request=(long)( ctrl*1000.f/PISTON_RATE );
+  long change_request=position_request-motor.position(BUOY_MTR_SEL);
+
+  if(change_request>deadband) {
+    // above target depth, go more negative by increasing the
+    // water in the piston
     mySerial.print("  NEG");
     motor.command(BUOY_MTR_SEL,BUOY_MTR_NEG);
-  } else if(PD<deadband) { // below target
+  } else if(change_request<deadband) {
+    // below target depth, become more positive by decreasing
+    // piston water volume
     mySerial.print("  POS");
     motor.command(BUOY_MTR_SEL,BUOY_MTR_POS);
   } else {
+    // within the deadband - shutoff.
     mySerial.print("  OFF");
     motor.command(BUOY_MTR_SEL,MOTOR_OFF);
   }
@@ -190,8 +241,13 @@ void Buoyancy::async_read() {
 void Buoyancy::display(void) {
   mySerial.print("buoyancy_enable="); mySerial.println(enabled);
   mySerial.print("buoyancy_state="); mySerial.println(state_labels[state]);
+  
+  mySerial.print("buoy_G_prop="); mySerial.println(G_prop);
+  mySerial.print("buoy_R_integ="); mySerial.println(R_integ);
   mySerial.print("buoy_T_deriv="); mySerial.println(T_deriv);
-  mySerial.print("buoy_T_lowpass="); mySerial.println(T_lowpass);
+  mySerial.print("buoy_transit_fraction="); mySerial.println(transit_fraction);
+  
+  // mySerial.print("buoy_T_lowpass="); mySerial.println(T_lowpass);
   mySerial.print("buoy_deadband="); mySerial.println(deadband);
   mySerial.print("buoy_depth="); mySerial.println(depth_target);
   mySerial.print("buoy_duration="); mySerial.println(mission_seconds);
@@ -218,7 +274,6 @@ void set_float(const char *arg,float *orig,const char *label) {
     }
   }
 }
-
 
 void Buoyancy::start_mission(void) {
   // enable motor
@@ -275,15 +330,29 @@ void set_int(const char *arg,int *orig,const char *label) {
   }
 }
 
+float Buoyancy::piston_water_volume(void) {
+  long pos=motor.position(BUOY_MTR_SEL);
+  //        ms * ml/s * s/ms => ml
+  float vol=pos*(PISTON_RATE*0.001);
+  
+  if ( BUOY_MTR_NEG==MOTOR_REV ) vol=BUOY_PISTON_ML-vol;
+  return vol;
+}
 
 bool Buoyancy::dispatch_command(const char *cmd, const char *cmd_arg) {
   float tmp;
   if ( !strcmp(cmd,"buoy") ) {
     display();
+  } else if(!strcmp(cmd,"buoy_G_prop")) {
+    set_float(cmd_arg,&G_prop,"buoy_G_prop");
+  } else if(!strcmp(cmd,"buoy_R_integ")) {
+    set_float(cmd_arg,&R_integ,"buoy_G_prop");
   } else if(!strcmp(cmd,"buoy_T_deriv")) {
     set_float(cmd_arg,&T_deriv,"buoy_T_deriv");
-  } else if(!strcmp(cmd,"buoy_T_lowpass")) {
-    set_float(cmd_arg,&T_lowpass,"buoy_T_lowpass");
+  //  } else if(!strcmp(cmd,"buoy_T_lowpass")) {
+  //    set_float(cmd_arg,&T_lowpass,"buoy_T_lowpass");
+  } else if(!strcmp(cmd,"buoy_transit_fraction")) {
+    set_float(cmd_arg,&transit_fraction,"buoy_transit_fraction");
   } else if(!strcmp(cmd,"buoy_deadband")) {
     set_float(cmd_arg,&deadband,"buoy_deadband");
   } else if(!strcmp(cmd,"buoy_duration")) {

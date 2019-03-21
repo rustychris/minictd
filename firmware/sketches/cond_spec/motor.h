@@ -1,20 +1,22 @@
 #ifndef MOTOR_H
 #define MOTOR_H
 #include "Sensor.h"
+#include "elapsedMillis.h"
 
 enum { 
   DISP_ENABLE=1,
   DISP_SENSE=2,
   DISP_CURRENT=4,
-  DISP_ALL=7,
-  DISP_OFF=8 // show stats for motors that are off
+  DISP_POSITION=8,
+  DISP_ALL=15,
+  DISP_OFF=16 // show stats for motors that are off
 };
-
 
 enum {
   MOTOR_OFF=0,
   MOTOR_FWD=1,
   MOTOR_REV=2,
+  MOTOR_ON=3, // FWD|REV
   MOTOR_LIMIT=4, // can be combined with FWD or REV
 };
 
@@ -54,6 +56,15 @@ public:
 
   void command(int motor,int cmd);
   void read_current(int motor);
+  void update_position(void);
+  
+  elapsedMillis position_elapsed;
+
+  // estimate of cumulative time in FWD in ms
+  long a_position;
+  long b_position;
+
+  long position(int motor) { return (motor==MOTOR_A)?a_position:b_position; }
   
 private:
   // if true, the motor driver is on.

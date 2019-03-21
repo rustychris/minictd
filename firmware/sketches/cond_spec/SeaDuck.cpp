@@ -158,7 +158,7 @@ SeaDuck::SeaDuck()
 #endif
   
 #ifdef HAS_BUOYANCY
-  // Should be *after* pressure
+  // Should be *after* pressure and motor
   sensors[num_sensors++]=&buoyancy;
 #endif
 

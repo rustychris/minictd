@@ -22,6 +22,8 @@ void Motor::init() {
 
   a_sense_offset=analogRead(MOTOR_ASENSE);
   b_sense_offset=analogRead(MOTOR_BSENSE);
+  a_position=-99999; // no knowledge of absolute position
+  b_position=-99999; // 
 }
 
 void Motor::disable(void){
@@ -41,6 +43,8 @@ void Motor::all_off(void){
 
 // handle requests for state transitions 
 void Motor::command(int motor,int cmd) {
+  update_position();
+  
   if (cmd==MOTOR_OFF) {
     if(motor&MOTOR_A) {
       digitalWrite(MOTOR_A1,0);
@@ -77,11 +81,39 @@ void Motor::command(int motor,int cmd) {
   }  
 }
 
+void Motor::update_position(void) {
+  // check current draw, but only for motors known to be on.
+  if ( a_status&MOTOR_ON ) {
+    read_current(MOTOR_A);
+    // update integral time
+    if ( a_status==MOTOR_FWD ) { // NOT at limit
+      a_position+=position_elapsed;
+    } else if ( a_status==MOTOR_REV ) { // NOT at limit
+      a_position-=position_elapsed;
+    } else if ( a_status==MOTOR_REV|MOTOR_LIMIT ) {
+      a_position=0; // established absolute zero.
+    }
+    // no update for MOTOR_FWD|MOTOR_LIMIT
+  }
+  if ( b_status&MOTOR_ON ) {
+    read_current(MOTOR_B);
+    if ( b_status==MOTOR_FWD ) {
+      b_position+=position_elapsed;
+    } else if ( b_status==MOTOR_REV ) {
+      b_position-=position_elapsed;
+    } else if ( b_status==MOTOR_REV|MOTOR_LIMIT ) {
+      b_position=0;
+    }
+  }
+  position_elapsed=0;
+}
+
 void Motor::async_read() {
-  // no work for motor yet, but we still have to play nice
-  // and keep the ball in the air.
   // in the future may include checks for current draw here
   // to be logged
+
+  update_position();
+  
   pop_fn_and_call();
 }
 
@@ -109,6 +141,8 @@ void Motor::read_current(int motor){
 }
 
 void Motor::display(unsigned int select) {
+  update_position();
+  
   if( select & DISP_ENABLE ) {
     mySerial.print("motor_enable="); mySerial.println( enabled );
   }
@@ -120,6 +154,9 @@ void Motor::display(unsigned int select) {
     }
     if(select&DISP_CURRENT) {
       mySerial.print("motor_a_current="); mySerial.println(a_current,3);
+    }
+    if(select&DISP_POSITION) {
+      mySerial.print("motor_a_position="); mySerial.println(a_position);
     }
     mySerial.print("motor_a_status=");
     if( a_status&MOTOR_FWD ) mySerial.print(" FWD");
@@ -134,6 +171,9 @@ void Motor::display(unsigned int select) {
     }
     if(select&DISP_CURRENT) {
       mySerial.print("motor_b_current="); mySerial.println(b_current,3);
+    }
+    if(select&DISP_POSITION) {
+      mySerial.print("motor_b_position="); mySerial.println(b_position);
     }
     mySerial.print("motor_b_status=");
     if( b_status&MOTOR_FWD ) mySerial.print(" FWD");

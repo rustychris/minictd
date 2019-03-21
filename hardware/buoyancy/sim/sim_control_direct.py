@@ -60,11 +60,7 @@ class Drifter(object):
     a_est=0.0 # estimated acceleration
     w_est=0.0 # estimated velocity from "pressure"
     z_est=0.0 # estimate vertical position
-    err_int=0.0 # integration of error
     
-    z_last=0.0 # for w_est
-    w_last=0.0 # for a_est
-
     # Terms in the PID[A] controller
     prop=0.0
     deriv=0.0
@@ -162,6 +158,7 @@ class Drifter(object):
         self.t_sec+=self.dt
 
     control_mode='direct_limited' # direct, binary, proportional
+    lowpass_error=True
     
     def update_control(self):
         """
@@ -170,7 +167,10 @@ class Drifter(object):
         self.update_w_est()
         
         # should the prop term use z_est, or z?
-        err=self.z_est-self.z_set
+        if self.lowpass_error:
+            err=self.z_est-self.z_set
+        else:
+            err=self.z-self.z_set
             
         self.prop=self.P*err
         self.deriv=self.T_deriv*self.w_est
@@ -328,17 +328,26 @@ class Drifter(object):
 
         fig.subplots_adjust(left=0.12,wspace=0.25,hspace=0.1)
         return fig
-#sim=Drifter(z_set=-2.0,Cd=2.0,T_deriv=10,u_star=0.005,T_w_est=1.0)
-#sim=Drifter(z_set=-2.0,Cd=2.0,T_deriv=60,u_star=0.01,T_w_est=1.0)
 
-# T_deriv=10, T_accel=100, T_w_est=20. is not bad, still small
-# oscillations.
 
+# using instant position for error:
+# with transit_fraction=0.1
+sim=Drifter(z_set=-0.10,Cd=0.15,
+            P=5,T_deriv=19,T_accel=0.0,rate_int=0.12,
+            control_mode='direct_limited',transit_fraction=0.1,
+            u_star=0.01,T_w_est=10.0,lowpass_error=False,
+            z_bed=-0.20,dt=0.1,
+            deadband=0.00)
+sim.integrate(500)
+sim.plot(5)
+    
+##
+# using lowpassed position for error:
 # with transit_fraction=0.1
 sim=Drifter(z_set=-0.10,Cd=0.15,
             P=3.2,T_deriv=19,T_accel=2.0,rate_int=0.12,
             control_mode='direct_limited',transit_fraction=0.1,
-            u_star=0.0,T_w_est=10.0,
+            u_star=0.01,T_w_est=10.0,
             z_bed=-0.20,dt=0.1,
             deadband=0.00)
 sim.integrate(500)
