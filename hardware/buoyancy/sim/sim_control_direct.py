@@ -170,6 +170,7 @@ class Drifter(object):
         if self.lowpass_error:
             err=self.z_est-self.z_set
         else:
+            # overall this seems better
             err=self.z-self.z_set
             
         self.prop=self.P*err
@@ -384,26 +385,4 @@ sim.plot(2)
 # shorter T_w_est lead to tighter depth-holding, but in reality
 # we have to be able to have long T_w_est in order to deal with
 # turbulent motions.
-
-
-# HERE:  consider options:
-#  an acceleration term
-#  two-stage PID, with an outer loop with a control variable of w,
-#    and the inner loop with control variable plunger_cmd.
-#  add motion planning -- max acceleration, max velocity, which
-#    then output target velocity, and inner loop which adjust the plunger
-#    to meet target velocity.
-#
-
-
-# What would it look like to add an acceleration term to the PID controller?
-# c(t) = P*e(t) + I * int(e(t)) + D * de(t)/dt + A*d2e(t)/dt2
-# A has units of time^2
-# D has units of time -- with the interpretation that we'll get back to 0 error
-#  in D time.
-# say we're 0.1m high, w=0, and d2e/dt2=-0.01 m/s2
-#      = P*0.1m + ...  + A*-0.01 m/s2
-# depending on the physical details, maybe that's a good place to be, so
-# 
-
 

@@ -90,10 +90,11 @@ void Motor::update_position(void) {
       a_position+=position_elapsed;
     } else if ( a_status==MOTOR_REV ) { // NOT at limit
       a_position-=position_elapsed;
-    } else if ( a_status==MOTOR_REV|MOTOR_LIMIT ) {
+    } else if ( a_status==(MOTOR_REV|MOTOR_LIMIT) ) {
       a_position=0; // established absolute zero.
+    } else if ( a_status==(MOTOR_FWD|MOTOR_LIMIT) ) {
+      // 
     }
-    // no update for MOTOR_FWD|MOTOR_LIMIT
   }
   if ( b_status&MOTOR_ON ) {
     read_current(MOTOR_B);
@@ -103,6 +104,8 @@ void Motor::update_position(void) {
       b_position-=position_elapsed;
     } else if ( b_status==MOTOR_REV|MOTOR_LIMIT ) {
       b_position=0;
+    } else if ( b_status==(MOTOR_FWD|MOTOR_LIMIT) ) {
+      // 
     }
   }
   position_elapsed=0;
@@ -126,7 +129,6 @@ void Motor::read_current(int motor){
     a_sense=analogRead(MOTOR_ASENSE) - a_sense_offset;
     a_current=a_decay*a_current + (1-a_decay)*a_sense*3.3/4096.0/MOTOR_ASENSE_R;
     if (  (a_status&(MOTOR_FWD|MOTOR_REV)) && (a_current<a_current_threshold) ) {
-      mySerial.println("LIMIT"); // temporary
       a_status |= MOTOR_LIMIT;
     }
   }
@@ -134,7 +136,6 @@ void Motor::read_current(int motor){
     b_sense=analogRead(MOTOR_BSENSE) - b_sense_offset;
     b_current=b_decay*b_current + (1-b_decay)*b_sense*3.3/4096.0/MOTOR_BSENSE_R;
     if ( (b_status&(MOTOR_FWD|MOTOR_REV)) && (b_current<b_current_threshold) ) {
-      mySerial.println("LIMIT"); // temporary
       b_status |= MOTOR_LIMIT;
     }
   }
@@ -286,12 +287,13 @@ void Motor::help() {
 }
   
 void Motor::write_frame_info(Print &out) {
-  out.print("('motor_status','<i2',2),('motor_sense','<i2',2),");
+  out.print("('motor_status','<i2',2),('motor_sense','<i2',2),('motor_position','<i4',2),");
 }
 
 typedef struct {
   int16_t a_status,b_status;
   int16_t a_sense,b_sense;
+  int32_t a_position,b_position;
 } full_record;
 
 void Motor::write_data(Print &out){
@@ -300,6 +302,8 @@ void Motor::write_data(Print &out){
   rec.b_status=b_status;
   rec.a_sense=(int16_t)a_sense;
   rec.b_sense=(int16_t)b_sense;
+  rec.a_position=a_position;
+  rec.b_position=b_position;
   
   write_base16(out,(uint8_t*)&rec,sizeof(rec));
 }

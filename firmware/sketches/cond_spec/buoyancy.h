@@ -64,6 +64,8 @@ public:
   float ctrl_prop; 
   float ctrl_deriv;
   float ctrl_integ; // TODO: be sure this is properly initialized
+
+  float ctrl; // sum of the control terms
   
   // lowpass the velocity
   void update_z(void);

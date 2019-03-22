@@ -88,6 +88,13 @@ void Buoyancy::init() {
   lpB[2]=0.00094469f;
   lpx[0]=lpx[1]=lpx[2]=0.0f;
   lpy[0]=lpy[1]=lpy[2]=0.0f;
+
+  // And some reasonable defaults for PID parameters
+  G_prop=5;
+  T_deriv=19;
+  R_integ=0.12;
+  transit_fraction=0.1;
+  deadband=0.0; // come back to this one.
 }
 
 void Buoyancy::disable(void){
@@ -188,7 +195,7 @@ void Buoyancy::async_read() {
   ctrl_deriv=T_deriv*w_mps;
 
   // the requested piston water volume
-  float ctrl=ctrl_prop+ctrl_integ+ctrl_deriv;
+  ctrl=ctrl_prop+ctrl_integ+ctrl_deriv;
 
   mySerial.print("  w_mps=");
   mySerial.print(w_mps,6);
@@ -378,8 +385,25 @@ void Buoyancy::help() {
   mySerial.println("    buoy_depth[=meters]      # target depth");
   mySerial.println("    buoy_start               # prepare and start mission");
 }
-  
-void Buoyancy::write_frame_info(Print &out) { }
-void Buoyancy::write_data(Print &out){ }
+
+typedef struct {
+  int16_t a_status,b_status;
+  int16_t a_sense,b_sense;
+  int32_t a_position,b_position;
+} full_record;
+
+void Buoyancy::write_frame_info(Print &out) {
+  out.print("('buoy_z_m','<f4'),('buoy_w_mps','<f4'),('buoy_ctrl_prop','<f4'),('buoy_ctrl_deriv','<f4'),('buoy_ctrl_integ','<f4'),('buoy_ctrl','<f4'),");
+}
+
+#define WRITE_VAR(X) write_base16(out,(uint8_t*)&(X),sizeof(X))
+void Buoyancy::write_data(Print &out){
+  WRITE_VAR(lpx[0]);
+  WRITE_VAR(w_mps);
+  WRITE_VAR(ctrl_prop);
+  WRITE_VAR(ctrl_deriv);
+  WRITE_VAR(ctrl_integ);
+  WRITE_VAR(ctrl);
+}
 
 #endif // HAS_BUOYANCY

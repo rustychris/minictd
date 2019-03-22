@@ -32,10 +32,12 @@ public:
     enabled=false;
     a_status=MOTOR_OFF;
     b_status=MOTOR_OFF;
-    a_current_threshold=0.015;
-    b_current_threshold=0.015;
-    a_decay=0.8;
-    b_decay=0.8;
+    // had been 0.015 with a decay of 0.08
+    // but got an occasional false positive that way.
+    a_current_threshold=0.010;
+    b_current_threshold=0.010;
+    a_decay=0.9;
+    b_decay=0.9;
   }
   
   virtual void init();

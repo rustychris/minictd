@@ -378,8 +378,11 @@ void SeaDuck::continuous_sample(void) {
       sensors[i]->exit_sample_loop();
     }
   }
-  
-  storage.loop();
+
+  // loop may have been leaving some data in buffers.
+  // I think cleanup is the correct one.
+  // storage.loop(); 
+  storage.cleanup();
 
 #ifdef STATUS_LED
   digitalWrite(STATUS_LED,LOW);
