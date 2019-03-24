@@ -33,7 +33,29 @@ void Motor::disable(void){
 }
 
 void Motor::enable(void) {
+  // whenever re-enabing get a new baseline sense offset
+  // among other things, if battery power comes up after
+  // USB power, the original readings could be bad.
+  const int samples=50;
+  a_sense_offset=b_sense_offset=0;
+  int i,reading;
+  
   digitalWrite(MOTOR_nSLEEP,1);
+
+  for(i=0;i<samples;i++) {
+    reading=analogRead(MOTOR_ASENSE);
+    // mySerial.print("MOTOR_ASENSE="); mySerial.println(reading);
+    
+    a_sense_offset+=reading;
+  }
+  a_sense_offset/=samples;
+
+  for(i=0;i<samples;i++) {
+    reading=analogRead(MOTOR_BSENSE);
+    b_sense_offset+=reading;
+  }
+  b_sense_offset/=samples;
+
   enabled=true;
 }
 
@@ -91,7 +113,12 @@ void Motor::update_position(void) {
     } else if ( a_status==MOTOR_REV ) { // NOT at limit
       a_position-=position_elapsed;
     } else if ( a_status==(MOTOR_REV|MOTOR_LIMIT) ) {
-      a_position=0; // established absolute zero.
+      // this is too dangerous with the possibility of false
+      // positives on the LIMIT test.  The PID code is fairly
+      // robust to drift here, so it's not that important to
+      // zero out.  Zeroing is now manual, and currently only
+      // done when buoy starts the mission.
+      // a_position=0; // established absolute zero.
     } else if ( a_status==(MOTOR_FWD|MOTOR_LIMIT) ) {
       // 
     }
@@ -103,7 +130,7 @@ void Motor::update_position(void) {
     } else if ( b_status==MOTOR_REV ) {
       b_position-=position_elapsed;
     } else if ( b_status==MOTOR_REV|MOTOR_LIMIT ) {
-      b_position=0;
+      // b_position=0; SEE ABOVE
     } else if ( b_status==(MOTOR_FWD|MOTOR_LIMIT) ) {
       // 
     }
@@ -123,18 +150,25 @@ void Motor::async_read() {
 void Motor::read_current(int motor){
   // read motor current for one or both, and update limit status
   // for motors currently on.
+  int reading;
   if (motor&MOTOR_A) {
     // this comes in as counts, and defaults to 10 bits over
-    // the 0..3.3V range.
-    a_sense=analogRead(MOTOR_ASENSE) - a_sense_offset;
-    a_current=a_decay*a_current + (1-a_decay)*a_sense*3.3/4096.0/MOTOR_ASENSE_R;
+    // the 0..3.3V range, but is set to 12 bits above.
+    // seems that there is some noise on the first 1 or 2 readings, though.
+    analogRead(MOTOR_ASENSE);reading=analogRead(MOTOR_ASENSE);
+    // mySerial.print("MOTOR_ASENSE="); mySerial.println(reading);
+    reading=analogRead(MOTOR_ASENSE);
+    // mySerial.print("MOTOR_ASENSE="); mySerial.println(reading);
+    a_sense=reading-a_sense_offset;
+    
+    a_current=a_decay*a_current + (1.0f-a_decay)*a_sense*3.3f/4096.0f/MOTOR_ASENSE_R;
     if (  (a_status&(MOTOR_FWD|MOTOR_REV)) && (a_current<a_current_threshold) ) {
       a_status |= MOTOR_LIMIT;
     }
   }
   if (motor&MOTOR_B) {
     b_sense=analogRead(MOTOR_BSENSE) - b_sense_offset;
-    b_current=b_decay*b_current + (1-b_decay)*b_sense*3.3/4096.0/MOTOR_BSENSE_R;
+    b_current=b_decay*b_current + (1.0f-b_decay)*b_sense*3.3f/4096.0f/MOTOR_BSENSE_R;
     if ( (b_status&(MOTOR_FWD|MOTOR_REV)) && (b_current<b_current_threshold) ) {
       b_status |= MOTOR_LIMIT;
     }
@@ -151,15 +185,19 @@ void Motor::display(unsigned int select) {
   if( (a_status!=MOTOR_OFF) || (select&DISP_OFF) ) {
     read_current(MOTOR_A);
     if(select&DISP_SENSE ) {
-      mySerial.print("motor_a_sense="); mySerial.println(a_sense);
+      mySerial.print(" motor_a_sense="); mySerial.print(a_sense);
     }
     if(select&DISP_CURRENT) {
-      mySerial.print("motor_a_current="); mySerial.println(a_current,3);
+      mySerial.print(" motor_a_current="); mySerial.print(a_current,3);
     }
     if(select&DISP_POSITION) {
-      mySerial.print("motor_a_position="); mySerial.println(a_position);
+      mySerial.print(" motor_a_position="); mySerial.print(a_position);
     }
-    mySerial.print("motor_a_status=");
+    if(select&DISP_OFFSET) {
+      mySerial.print(" motor_a_sense_offset="); mySerial.print(a_sense_offset);
+    }
+    
+    mySerial.print(" motor_a_status=");
     if( a_status&MOTOR_FWD ) mySerial.print(" FWD");
     if( a_status&MOTOR_REV ) mySerial.print(" REV");
     if( a_status&MOTOR_LIMIT ) mySerial.print(" LIMIT");
@@ -168,15 +206,17 @@ void Motor::display(unsigned int select) {
   if( (b_status!=MOTOR_OFF) || (select&DISP_OFF) ) {
     read_current(MOTOR_B);
     if(select & DISP_SENSE ) {
-      mySerial.print("motor_b_sense="); mySerial.println(b_sense);
+      mySerial.print(" motor_b_sense="); mySerial.print(b_sense);
     }
     if(select&DISP_CURRENT) {
-      mySerial.print("motor_b_current="); mySerial.println(b_current,3);
+      mySerial.print(" motor_b_current="); mySerial.print(b_current,3);
     }
     if(select&DISP_POSITION) {
-      mySerial.print("motor_b_position="); mySerial.println(b_position);
+      mySerial.print(" motor_b_position="); mySerial.print(b_position);
     }
-    mySerial.print("motor_b_status=");
+    mySerial.print(" motor_b_sense_offset="); mySerial.print(b_sense_offset);
+    
+    mySerial.print(" motor_b_status=");
     if( b_status&MOTOR_FWD ) mySerial.print(" FWD");
     if( b_status&MOTOR_REV ) mySerial.print(" REV");
     if( b_status&MOTOR_LIMIT ) mySerial.print(" LIMIT");

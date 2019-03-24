@@ -130,6 +130,7 @@ void Buoyancy::update_z(void) {
 void Buoyancy::enter_sample_loop(void) {
   // arguably could set baseline atmospheric pressure here, too
   mission_time=0;
+  ctrl_integ=0.0f; // start with a clean slate.
 }
 
 void Buoyancy::exit_sample_loop(void) {
@@ -212,9 +213,16 @@ void Buoyancy::async_read() {
     // on paper this should also subtract the ctrl_deriv,
     // but in simulation results were slightly better with adding
     // ctrl_deriv.
-    //                 ms            ml/s           s/ms
-    float piston_ml=motor.position(BUOY_MTR_SEL)*PISTON_RATE * 0.0001f;
+    //                              ms            ml/s           s/ms
+    float piston_ml=motor.position(BUOY_MTR_SEL)*PISTON_RATE * 0.001f;
     ctrl_integ=piston_ml - ctrl_prop + ctrl_deriv;
+    // DBG:
+    Serial.print("ctrl_integ="); Serial.print(ctrl_integ,4);
+    Serial.print("  piston_ml="); Serial.print(piston_ml,4);
+    Serial.print("  ctrl_prop="); Serial.print(ctrl_prop,4);
+    Serial.print("  ctrl_deriv="); Serial.print(ctrl_deriv,4);
+    Serial.println();
+    
     ctrl=BUOY_PISTON_ML; // max neg.
   } 
 
@@ -226,19 +234,39 @@ void Buoyancy::async_read() {
   if(change_request>deadband) {
     // above target depth, go more negative by increasing the
     // water in the piston
-    mySerial.print("  NEG");
-    motor.command(BUOY_MTR_SEL,BUOY_MTR_NEG);
+    // force a transition through OFF if motor is currently going in the wrong
+    // direction.
+    
+    if(motor.status(BUOY_MTR_SEL) & BUOY_MTR_NEG) {
+      // already going negative
+      mySerial.print("  neg");
+    } else if(motor.status(BUOY_MTR_SEL) & BUOY_MTR_POS) {
+      // positive, so go through off.
+      mySerial.print("  OFF...");
+      motor.command(BUOY_MTR_SEL,MOTOR_OFF);
+    } else {
+      // off, so go negative
+      mySerial.print("  NEG");
+      motor.command(BUOY_MTR_SEL,BUOY_MTR_NEG);
+    }
   } else if(change_request<deadband) {
     // below target depth, become more positive by decreasing
     // piston water volume
-    mySerial.print("  POS");
-    motor.command(BUOY_MTR_SEL,BUOY_MTR_POS);
+    if(motor.status(BUOY_MTR_SEL) & BUOY_MTR_POS) {
+      mySerial.print("  pos");
+    } else if(motor.status(BUOY_MTR_SEL) & BUOY_MTR_NEG) {
+      mySerial.print("  OFF...");
+      motor.command(BUOY_MTR_SEL,MOTOR_OFF);
+    } else {
+      // off so go positive
+      mySerial.print("  POS");
+      motor.command(BUOY_MTR_SEL,BUOY_MTR_POS);
+    }
   } else {
     // within the deadband - shutoff.
     mySerial.print("  OFF");
     motor.command(BUOY_MTR_SEL,MOTOR_OFF);
   }
-
   mySerial.println();
   
   // and keep the ball in the air.
@@ -299,12 +327,14 @@ void Buoyancy::start_mission(void) {
 
   // be sure it goes until it hits the limit.
   while ( motor.wait_and_stop() != MOTOR_LIMIT ) {
-    mySerial.println("Appears not have hit its limit");
+    mySerial.println("Appears not to have hit its limit");
     motor.command(BUOY_MTR_SEL,BUOY_MTR_POS);
   }
-
   mySerial.println("At full positive -- armed to start mission");
 
+  motor.command(BUOY_MTR_SEL,MOTOR_OFF);
+  motor.position_reset(BUOY_MTR_SEL);
+  
   // Make sure we have an up to date pressure reading
   pressure.read();
   atm_press_dPa=pressure.pressure_abs_dPa;
@@ -313,7 +343,7 @@ void Buoyancy::start_mission(void) {
   mySerial.println("dbar");
   
   // Set Buoyancy state so that once the sample loop is going
-  // the PD loop will begin.
+  // the PID loop will begin.
   enabled=true; // affects whether sample loop will
   state=ARMED;
 }

@@ -8,8 +8,9 @@ enum {
   DISP_SENSE=2,
   DISP_CURRENT=4,
   DISP_POSITION=8,
-  DISP_ALL=15,
-  DISP_OFF=16 // show stats for motors that are off
+  DISP_OFFSET=16,
+  DISP_ALL=31,
+  DISP_OFF=32 // show stats for motors that are off
 };
 
 enum {
@@ -67,6 +68,12 @@ public:
   long b_position;
 
   long position(int motor) { return (motor==MOTOR_A)?a_position:b_position; }
+  void position_reset(int motor) {
+    if(motor&MOTOR_A) a_position=0;
+    if(motor&MOTOR_B) b_position=0;
+  }
+
+  int16_t status(int motor) { return (motor==MOTOR_A)?a_status:b_status; }
   
 private:
   // if true, the motor driver is on.
