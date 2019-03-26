@@ -42,6 +42,10 @@ public:
   void open_next_file(void);
   void close_file(void);
 
+#ifdef HAS_ZMODEM
+  void zmodem_send_file(const char *filename);
+#endif
+  
   // incremented by the number of samples the
   // ISR couldn't write because there were no more free buffer blocks.
   uint32_t overruns;

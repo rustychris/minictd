@@ -13,8 +13,16 @@
 #include "SdFunctions.h"
 #include "SeaDuck.h"
 
+#ifdef HAS_ZMODEM
+#include "zmodem.h"
+extern int Filesleft;
+extern long Totalleft;
+SdFile fout; // specific to zmodem interface
+#endif
+
 SdFat sd;     // for logging
 SdFile myFile;// for logging
+
 
 // tradeoff of latency tolerance versus RAM usage.
 // at 10kHz logging, 12 got some overruns.
@@ -278,12 +286,38 @@ bool Storage::dispatch_command(const char *cmd, const char *cmd_arg) {
     mySerial.println(active_filename);
   } else if ( strcmp(cmd,"sd_close")==0) {
     close_file();
+  } else if ( strcmp(cmd,"sz")==0) {
+    zmodem_send_file(cmd_arg);
   } else {
     return false;
   }
   return true;
 }
 
+void Storage::zmodem_send_file(const char *filename) {
+  if (!fout.open(filename, O_READ)) {
+    mySerial.println("file.open failed");
+    return;
+  }
+
+  // Zmodem notes:
+  // from zmodem.ino:
+
+  // To send a file from the arduino to host, looks like this is the recipe:
+  // note that fout is access via extern from zmodem_sz.cpp, so must stick
+  // with that name.
+  
+  // Start the ZMODEM transfer
+  Filesleft = 1; // these are globals from zmodem_sz.cpp
+  Totalleft = fout.fileSize();
+  mySerial.print("rz\r");
+  sendzrqinit();
+  delay(200);
+  wcs(filename);
+  saybibi();
+  fout.close();
+}
+      
 void Storage::help() {
   mySerial.println("  Storage");
   mySerial.println("    erase       # erase SD card");
@@ -293,4 +327,7 @@ void Storage::help() {
   mySerial.println("    sd_status   # display SD info");
   mySerial.println("    sd_open     # open next file for output");
   mySerial.println("    sd_close    # close current output file");
+#ifdef HAS_ZMODEM
+  mySerial.println("    sz=filename.ext # send file via zmodem");
+#endif
 }
