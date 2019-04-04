@@ -8,6 +8,13 @@
 
 #include <Print.h>
 
+#ifdef HAS_XMODEM
+typedef enum {
+  XMODEM=0,
+  YMODEM=1,
+} xmodem_proto_t;
+#endif
+
 
 class Storage : public Print {
 public:
@@ -44,6 +51,9 @@ public:
 
 #ifdef HAS_ZMODEM
   void zmodem_send_file(const char *filename);
+#endif
+#ifdef HAS_XMODEM
+  void xmodem_send_file(const char *filename,xmodem_proto_t proto);
 #endif
   
   // incremented by the number of samples the

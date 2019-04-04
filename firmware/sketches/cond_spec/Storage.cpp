@@ -286,14 +286,23 @@ bool Storage::dispatch_command(const char *cmd, const char *cmd_arg) {
     mySerial.println(active_filename);
   } else if ( strcmp(cmd,"sd_close")==0) {
     close_file();
+#ifdef HAS_ZMODEM
   } else if ( strcmp(cmd,"sz")==0) {
     zmodem_send_file(cmd_arg);
+#endif // HAS_ZMODEM
+#ifdef HAS_XMODEM
+  } else if ( strcmp(cmd,"sx")==0) {
+    xmodem_send_file(cmd_arg,XMODEM);
+  } else if ( strcmp(cmd,"sb")==0) {
+    xmodem_send_file(cmd_arg,YMODEM);
+#endif // HAS_XMODEM
   } else {
     return false;
   }
   return true;
 }
 
+#ifdef HAS_ZMODEM
 void Storage::zmodem_send_file(const char *filename) {
   if (!fout.open(filename, O_READ)) {
     mySerial.println("file.open failed");
@@ -317,6 +326,35 @@ void Storage::zmodem_send_file(const char *filename) {
   saybibi();
   fout.close();
 }
+#endif // HAS_ZMODEM
+
+#ifdef HAS_XMODEM
+#include "XModem.h"
+
+void Storage::xmodem_send_file(const char *filename, xmodem_proto_t proto) {
+  close_file(); // be sure we don't have some log file sitting open.
+  
+  if (!myFile.open(filename, O_READ)) {
+    mySerial.println("file.open failed");
+    return;
+  }
+  if(proto==XMODEM)
+    mySerial.write("rx\r"); // ad-hoc trigger for download
+  else
+    mySerial.write("rb\r"); // ad-hoc trigger for download
+
+  char mode;
+  if (proto==XMODEM) {
+    mode=ModeXModem;
+  } else {
+    mode=ModeYModem;
+  }
+  XModem xmodem(&mySerial, mode);
+  
+  xmodem.sendFile(myFile,filename);
+  close_file();
+}
+#endif // HAS_XMODEM
       
 void Storage::help() {
   mySerial.println("  Storage");
@@ -329,5 +367,9 @@ void Storage::help() {
   mySerial.println("    sd_close    # close current output file");
 #ifdef HAS_ZMODEM
   mySerial.println("    sz=filename.ext # send file via zmodem");
+#endif
+#ifdef HAS_XMODEM
+  mySerial.println("    sx=filename.ext # send file via xmodem");
+  mySerial.println("    sb=filename.ext # send file via ymodem");
 #endif
 }

@@ -8,16 +8,16 @@
 #include "cfg_imu.h"
 
 // UNCOMMENT for GPS drifter
-#include "cfg_gps.h"
+// #include "cfg_gps.h"
 
 // UNCOMMENT for neutral drifter
-// #include "cfg_pressure.h"
-// #include "cfg_rtc_ds3231.h"
-// #include "cfg_motor.h"
-// #include "cfg_buoyancy.h"
-// #include "cfg_btserial.h"
+#include "cfg_pressure.h"
+#include "cfg_rtc_ds3231.h"
+#include "cfg_motor.h"
+#include "cfg_buoyancy.h"
+#include "cfg_btserial.h"
 
-#include "cfg_zmodem.h"
+#include "cfg_xmodem.h"
 
 // -- Common --
 

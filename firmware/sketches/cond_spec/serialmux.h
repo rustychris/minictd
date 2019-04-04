@@ -11,13 +11,20 @@
 class SerialMux : public Stream
 {
 public:
+  SerialMux(void) {
+#ifdef BT2S
+    bt_baud=BT2S_BAUD;
+#endif
+  }
+
   uint32_t last_activity_millis;
+  int bt_baud;
 
   virtual void begin(int baud=115200) {
     last_activity_millis=millis();
     Serial.begin(baud);
 #ifdef BT2S
-    BT2S.begin(BT2S_BAUD);
+    BT2S.begin(bt_baud);
 #endif
   }
   Stream *src(void);  
@@ -59,6 +66,8 @@ public:
   // no way to know if BT is connected right now -- so defer
   // Serial.
   operator bool() { return (bool)Serial; }
+
+  void pass_through(void);
 };
 
 extern SerialMux mySerial;

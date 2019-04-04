@@ -233,6 +233,16 @@ void SeaDuck::dispatch_command() {
       sample_interval_us=atoi(cmd_arg);      
     }
     mySerial.print("interval_us="); mySerial.println(sample_interval_us);
+#ifdef BT2S
+  } else if ( strcmp("bt_passthrough",cmd)==0 ) {
+    mySerial.pass_through();
+  } else if ( strcmp("bt_baud",cmd)==0 ) {
+    if(cmd_arg) {
+      mySerial.bt_baud=atoi(cmd_arg);
+    }
+    mySerial.print("bt_baud="); mySerial.println(mySerial.bt_baud);
+    mySerial.println("# Will not take effect until after a bt_passthrough");
+#endif
   } else {
     Shell::dispatch_command();
   }

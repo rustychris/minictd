@@ -3,6 +3,7 @@ import subprocess
 import sys
 import serial.tools.miniterm as mod_miniterm
 from serial.tools.miniterm import key_description
+import xmodem
 
 # this does figure out when zmodem is trying to start,
 # fine for feeding characters to rz.
@@ -19,12 +20,12 @@ class ZModem(mod_miniterm.Transform):
         for t in text:
             self.recent.pop(0)
             self.recent.append(t)
-            if self.parent and self.parent.rz is None:
+            if self.parent and self.parent.rzmodem is None:
                 if (self.recent[-2]=='*'):
                     if (self.recent[-1]=="\x18"):
                         if self.parent:
                             sys.stderr.write("<GOT ZMODEM starting rz>")
-                            self.parent.start_rz()
+                            self.parent.start_rzmodem()
                         else:
                             sys.stderr.write("<GOT ZMODEM no parent>")
                         sys.stderr.flush()
@@ -33,27 +34,88 @@ class ZModem(mod_miniterm.Transform):
     def tx(self, text):
         return text
 
+
+class XModem(mod_miniterm.Transform):
+    """
+    Detect and start xmodem downloads
+    There isn't a real xmodem start string, so this watches for rx\r
+    """
+    parent=None
+    def __init__(self):
+        super(XModem,self).__init__()
+        self.recent=["_","_","_"]
+        
+    def rx(self, text):
+        for t in text:
+            self.recent.pop(0)
+            self.recent.append(t)
+            if self.parent and self.parent.rxmodem is None:
+                recent="".join(self.recent)
+                if recent=="rx\r":
+                    sys.stderr.write("<Start XMODEM>\n")
+                    sys.stderr.flush()
+                    self.parent.start_rxmodem("xmodem")
+                if recent=="rb\r":
+                    sys.stderr.write("<Start YMODEM>\n")
+                    sys.stderr.flush()
+                    self.parent.start_rxmodem("ymodem")
+        return text
+
+    def tx(self, text):
+        return text
+    
 mod_miniterm.TRANSFORMATIONS['zmodem']=ZModem
+mod_miniterm.TRANSFORMATIONS['xmodem']=XModem
 
 class zMiniterm(mod_miniterm.Miniterm):
     def __init__(self,*a,**k):
         super(zMiniterm,self).__init__(*a,**k)
-        self.rz=None # active rz process
-        print("zMiniterm!")
+        self.rzmodem=None # active rz process
+        self.rxmodem=None # active xmodem class
     def update_transformations(self):
         super(zMiniterm,self).update_transformations()
         for xf in self.rx_transformations:
             xf.parent=self
         for xf in self.tx_transformations:
             xf.parent=self
-    def start_rz(self):
-        if self.rz is not None:
+    def start_rzmodem(self):
+        if self.rzmodem is not None:
             sys.stderr("rz already running")
         else:
-            self.rz=subprocess.Popen(["/usr/bin/rz","-b","-E","-vvv","-X"],
+            self.rzmodem=subprocess.Popen(["/usr/bin/rz","-b","-E","-vvv","-X"],
                                      stdin=subprocess.PIPE,
                                      stdout=subprocess.PIPE,
                                      stderr=sys.stderr)
+    def start_rxmodem(self,mode='xmodem'):
+        def getc(size,timeout=1):
+            # print("[recv,t0=%s: "%timeout,end="")
+            orig_timeout=self.serial.timeout
+            self.serial.timeout=timeout
+            val=self.serial.read(size) or None
+            self.serial.timeout=orig_timeout
+            # print("%s]"%(repr(val)[:10]),end="")
+            return val
+        def putc(data,timeout=1):
+            # print("[send %s:"%(repr(data[:10])),end="")
+            val=self.serial.write(data) or None
+            # print("%s]"%repr(val))
+            return val
+
+        if mode=='xmodem':
+            self.rxmodem=xmodem.XMODEM(getc,putc,mode='xmodem')
+        elif mode=='ymodem':
+            self.rxmodem=xmodem.YMODEM(getc,putc,mode='xmodem')
+            
+        result=self.rxmodem.recv(timeout=2,retry=3,
+                                 default_filename="saved.bin")
+        print()
+        if result is None:
+            print("[XMODEM failed]")
+        else:
+            filename,size=result
+            print("[XMODEM %s, %d bytes]"%(filename,size))
+        self.rxmodem=None
+        
     def reader(self):
         """loop and copy serial->console"""
         try:
@@ -68,13 +130,13 @@ class zMiniterm(mod_miniterm.Miniterm):
                         for transformation in self.rx_transformations:
                             text = transformation.rx(text)
                         self.console.write(text)
-                    if self.rz is not None:
-                        if self.rz.returncode is not None:
-                            self.rz.wait()
-                            self.rz=None
+                    if self.rzmodem is not None:
+                        if self.rzmodem.returncode is not None:
+                            self.rzmodem.wait()
+                            self.rzmodem=None
                             self.console.write("[rz quit]")
                         else:
-                            self.rz.stdin.write(data)
+                            self.rzmodem.stdin.write(data)
                         
         except serial.SerialException:
             self.alive = False
@@ -90,13 +152,13 @@ class zMiniterm(mod_miniterm.Miniterm):
         menu_active = False
         try:
             while self.alive:
-                if self.rz is not None:
-                    if self.rz.returncode is not None:
-                        self.rz.wait()
-                        self.rz=None
+                if self.rzmodem is not None:
+                    if self.rzmodem.returncode is not None:
+                        self.rzmodem.wait()
+                        self.rzmodem=None
                         self.console.write("[rz quit]")
                         continue
-                    c=self.rz.stdout.read(1)
+                    c=self.rzmodem.stdout.read(1)
                     self.serial.write(c)
                     text=self.rx_decoder.decode(c)
                     self.console.write(text) # show to user, too.
@@ -116,6 +178,9 @@ class zMiniterm(mod_miniterm.Miniterm):
                 elif c == self.exit_character:
                     self.stop()             # exit app
                     break
+                elif self.rxmodem is not None:
+                    print("<rxmodem in progress>")
+                    # Maybe we could abort transfers, but not yet sure how.
                 else:
                     #~ if self.raw:
                     text = c
@@ -276,7 +341,7 @@ def main(default_port=None, default_baudrate=9600, default_rts=None, default_dtr
             sys.exit(1)
         filters = args.filter
     else:
-        filters = ['zmodem']
+        filters = ['xmodem']
 
     while True:
         # no port given on command line -> ask user now
@@ -382,3 +447,17 @@ if __name__=='__main__':
 
 # rz gets patched into the reader and writer, I assume.
 # 
+
+##
+
+# Xmodem:
+# itsy send rx\r
+# mini_console fires up xmodem
+# xmodem immediately sends 'C'
+# gets back \x01 \x9c c
+# but then xmodem complains that it wanted sequence 1, but got 156?
+# which is the second byte.
+
+# itsy code, after getting the C and no K, should send SOH, then packet number, then xor of packet number.
+#  SOH is 0x01.
+#  so that's fine, but next should be packet number and then xor of packet number.  
