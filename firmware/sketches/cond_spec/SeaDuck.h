@@ -17,6 +17,8 @@ extern ADC *adc;
 #include "Sensor.h"
 
 
+typedef enum { STOP_NONE=0,STOP_DURATION=1,STOP_KEY=2 } stop_condition_t;
+
 class SeaDuck : public Shell
 {
   uint32_t sample_interval_us;
@@ -26,7 +28,7 @@ public:
   SeaDuck(); 
 
   void setup();
-  virtual void dispatch_command();
+  virtual void dispatch_command(const char *, const char *);
   virtual void help();
 
   Sensor *sensors[MAX_NUM_SENSORS];
@@ -35,7 +37,7 @@ public:
   time_t unixtime();
 
   void oneshot_sample();
-  void continuous_sample();
+  stop_condition_t continuous_sample(long duration_ms=0);
   void write_header(void);
   void async_oneshot(void);
   void async_output(void);

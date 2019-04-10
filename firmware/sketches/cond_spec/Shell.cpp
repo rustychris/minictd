@@ -4,6 +4,7 @@
 
 #include "Shell.h"
 #include "serialmux.h"
+#include <AWire.h>
 
 void Shell::setup(void) {
   mode = MODE_BOOT;
@@ -28,10 +29,10 @@ void Shell::loop(void) {
 void Shell::command_loop(void) {
   get_next_command("seaduck>\r\n");
 
-  dispatch_command();
+  dispatch_command(base_cmd,base_cmd_arg);
 }
 
-void Shell::dispatch_command(void) {
+void Shell::dispatch_command(const char *cmd, const char *cmd_arg) {
   if ( strcmp(cmd,"help")==0 ) {
     help();
   } else if ( strcmp(cmd,"!")==0 ) {
@@ -46,6 +47,13 @@ void Shell::dispatch_command(void) {
     SCB_AIRCR = 0x5FA0004;
 #else
     // M0 reset: https://forum.arduino.cc/index.php?topic=379950.0
+    // seems that it will just hang if we don't stop Serial first.
+    // not sure which of these are required, but at least one of them
+    // is.
+    Serial.end();
+#ifdef BT2S
+    BT2S.end();
+#endif
     NVIC_SystemReset();
 #endif
     delay(100); // restart has a small lag
@@ -105,12 +113,12 @@ void Shell::get_next_command(const char *prompt) {
       mySerial.print(prompt);
     }
 
-    cmd_arg=NULL;
+    base_cmd_arg=NULL;
     
     while(pos<CMD_BUFFLEN-1) {
       if( use_serial ) {
         while(!mySerial.available()) ;
-        cmd[pos] = mySerial.read();
+        base_cmd[pos] = mySerial.read();
       } else {
         tmp=file.read();
         if( tmp<0 ) {
@@ -122,17 +130,17 @@ void Shell::get_next_command(const char *prompt) {
           // about this event here.
           break;
         } else {
-          cmd[pos] = (uint8_t)tmp;
+          base_cmd[pos] = (uint8_t)tmp;
         }
       }
       
       // handle backspace, lamely.
-      if( cmd[pos] == 8 ) {
+      if( base_cmd[pos] == 8 ) {
         mySerial.print(" CANCEL");
         pos = 0; // signal restart
         break;
       } else {
-        if( cmd[pos] == '\r' or cmd[pos] == '\n' ) {
+        if( base_cmd[pos] == '\r' or base_cmd[pos] == '\n' ) {
           // a little tricky, since it's possible to get cr, cr/lf, or lf
           // newlines.  This could be left over from a previous line.
           // for console use, better to print the prompt again so that
@@ -140,16 +148,16 @@ void Shell::get_next_command(const char *prompt) {
           // there is a connection.
           if( use_serial )
             mySerial.println();
-          cmd[pos] = '\0'; // null terminate it
+          base_cmd[pos] = '\0'; // null terminate it
           break;
         }
         if( use_serial )
-          mySerial.print(cmd[pos]); // echo back to user
+          mySerial.print(base_cmd[pos]); // echo back to user
 
         // special handling for separate =
-        if( cmd[pos]=='=' ) {
-          cmd[pos] = '\0';
-          cmd_arg=cmd+pos+1;
+        if( base_cmd[pos]=='=' ) {
+          base_cmd[pos] = '\0';
+          base_cmd_arg=base_cmd+pos+1;
         }
         pos++;
         if(pos==CMD_BUFFLEN) { // protect overrun:

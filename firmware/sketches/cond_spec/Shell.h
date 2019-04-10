@@ -16,10 +16,14 @@
 class Shell {
 protected:
   char label[LABEL_BUFFLEN];
-  char cmd[CMD_BUFFLEN];
+  // base_cmd and base_cmd_arg are state that is updated at the top level
+  // parsing (i.e. get_next_command).  Recursive calls to dispatch_command
+  // are possible by passing some other pair of strings.
+  char base_cmd[CMD_BUFFLEN];
   // when a command with an '=' is found, it's split there
   // with the second part pointed to by cmd_arg
-  char *cmd_arg;
+  char *base_cmd_arg;
+  
   uint8_t request_mode,mode;
 
   // For reading commands from a file:
@@ -54,7 +58,7 @@ public:
   void get_next_command(const char *);
   virtual void help(void);
 
-  virtual void dispatch_command(void);
+  virtual void dispatch_command(const char *cmd, const char *cmd_arg);
 };
 
 

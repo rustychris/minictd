@@ -217,7 +217,7 @@ void SeaDuck::setup() {
   activate_cmd_file(CMDFILE);
 }
 
-void SeaDuck::dispatch_command() {
+void SeaDuck::dispatch_command(const char *cmd, const char *cmd_arg) {
   for(int i=0;i<num_sensors;i++) {
     if( sensors[i]->dispatch_command(cmd,cmd_arg) )
       return;
@@ -244,7 +244,7 @@ void SeaDuck::dispatch_command() {
     mySerial.println("# Will not take effect until after a bt_passthrough");
 #endif
   } else {
-    Shell::dispatch_command();
+    Shell::dispatch_command(cmd,cmd_arg);
   }
 }
 
@@ -253,6 +253,8 @@ void SeaDuck::help() {
   mySerial.println("    sample # one-shot sampling");
   mySerial.println("    sample_loop # continuous sampling");
   mySerial.println("    interval_us[=NNNN] # sampling interval in usecs");
+  mySerial.println("    bt_passthrough     # pipe data between BT and USB serial");
+  mySerial.println("    bt_baud[=NNNNN]    # set baud rate for BT");
   for(int i=0;i<num_sensors;i++ ) {
     sensors[i]->help();
   }
@@ -344,8 +346,12 @@ void timer_isr(void) {
 }
 
 // asynchronous repeated sampling
-void SeaDuck::continuous_sample(void) {
+// return value: STOP_DURATION
+//               STOP_KEY
+//  
+stop_condition_t SeaDuck::continuous_sample(long duration_ms) {
   elapsedMillis elapsed;
+  stop_condition_t stop_condition=STOP_NONE;
 
   // start with data definition
   write_header();
@@ -376,8 +382,16 @@ void SeaDuck::continuous_sample(void) {
       uint8_t c=mySerial.read();
       // stop it when an exclamation or ESC is read
       if ( (c=='!') || (c==27) ) {
+        stop_condition=STOP_KEY;
         break;
       } 
+    }
+
+    if( (duration_ms>0) && (elapsed>duration_ms) ) {
+      mySerial.print("# Exiting sample loop on elapsed=");
+      mySerial.println(elapsed);
+      stop_condition=STOP_DURATION;
+      break;
     }
   }
   Timer.end();
@@ -389,9 +403,8 @@ void SeaDuck::continuous_sample(void) {
     }
   }
 
-  // loop may have been leaving some data in buffers.
-  // I think cleanup is the correct one.
-  // storage.loop(); 
+  // storage.loop() may leave some data in buffers -- cleanup() is the
+  // correct call here.
   storage.cleanup();
 
 #ifdef STATUS_LED
@@ -399,4 +412,5 @@ void SeaDuck::continuous_sample(void) {
 #endif
 
   mySerial.println("# Exiting interval timer loop. ");
+  return stop_condition;
 }

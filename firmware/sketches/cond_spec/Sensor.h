@@ -25,7 +25,9 @@ public:
   virtual void init(){};
   void read();
   virtual void async_read(){};
-  
+
+  // handle user commands, or return false if not handled.
+  // this must be reentrant, so that compound commands can be used.
   virtual bool dispatch_command(const char *, const char *){return false;};
   virtual void help(){};
   virtual void write_frame_info(Print &out){};

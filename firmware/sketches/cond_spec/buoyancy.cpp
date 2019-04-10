@@ -52,7 +52,7 @@
 
  */
 
-
+#include "SeaDuck.h"
 #include "motor.h"
 #include "buoyancy.h"
 
@@ -217,11 +217,10 @@ void Buoyancy::async_read() {
     float piston_ml=motor.position(BUOY_MTR_SEL)*PISTON_RATE * 0.001f;
     ctrl_integ=piston_ml - ctrl_prop + ctrl_deriv;
     // DBG:
-    Serial.print("ctrl_integ="); Serial.print(ctrl_integ,4);
-    Serial.print("  piston_ml="); Serial.print(piston_ml,4);
-    Serial.print("  ctrl_prop="); Serial.print(ctrl_prop,4);
-    Serial.print("  ctrl_deriv="); Serial.print(ctrl_deriv,4);
-    Serial.println();
+    // Serial.print("ctrl_integ="); Serial.print(ctrl_integ,4);
+    // Serial.print("  piston_ml="); Serial.print(piston_ml,4);
+    // Serial.print("  ctrl_prop="); Serial.print(ctrl_prop,4);
+    // Serial.print("  ctrl_deriv="); Serial.print(ctrl_deriv,4);
     
     ctrl=BUOY_PISTON_ML; // max neg.
   } 
@@ -398,6 +397,25 @@ bool Buoyancy::dispatch_command(const char *cmd, const char *cmd_arg) {
     set_float(cmd_arg,&depth_target,"buoy_depth");
   } else if(!strcmp(cmd,"buoy_start")) {
     start_mission();
+  } else if(!strcmp(cmd,"buoy_yoyo")) {
+    // just for internal testing
+    while( 1 ) {
+      // repeatedly runs the current mission.
+      start_mission();
+      // log data for the full mission length, plus 2 minutes
+      // to go full positive.
+      logger.dispatch_command("sd_open",(char*)NULL);
+      // this blocks for the given time
+      stop_condition_t stop_condition;
+      stop_condition=logger.continuous_sample(1000*(120+mission_seconds));
+      // 
+      logger.dispatch_command("sd_close",(char*)NULL);
+      
+      if ( stop_condition==STOP_KEY ) {
+        mySerial.println("Exiting yoyo with key press");
+        break;
+      }
+    }
   } else {
     return false;
   }
