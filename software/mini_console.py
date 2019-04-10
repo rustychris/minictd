@@ -1,4 +1,5 @@
 import serial
+import time
 import subprocess
 import sys
 import serial.tools.miniterm as mod_miniterm
@@ -105,15 +106,17 @@ class zMiniterm(mod_miniterm.Miniterm):
             self.rxmodem=xmodem.XMODEM(getc,putc,mode='xmodem')
         elif mode=='ymodem':
             self.rxmodem=xmodem.YMODEM(getc,putc,mode='xmodem')
-            
+
+        time_start=time.time()
         result=self.rxmodem.recv(timeout=2,retry=3,
                                  default_filename="saved.bin")
+        elapsed=time.time()-time_start
         print()
         if result is None:
             print("[XMODEM failed]")
         else:
             filename,size=result
-            print("[XMODEM %s, %d bytes]"%(filename,size))
+            print("[XMODEM %s, %d bytes, %.1f seconds, %.1f bytes/sec]"%(filename,size,elapsed,size/elapsed))
         self.rxmodem=None
         
     def reader(self):
@@ -179,7 +182,8 @@ class zMiniterm(mod_miniterm.Miniterm):
                     self.stop()             # exit app
                     break
                 elif self.rxmodem is not None:
-                    print("<rxmodem in progress>")
+                    print("<attempt to abort rxmodem in progress>")
+                    self.rxmodem.abort_requested=True
                     # Maybe we could abort transfers, but not yet sure how.
                 else:
                     #~ if self.raw:

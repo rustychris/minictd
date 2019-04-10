@@ -209,6 +209,7 @@ class XMODEM(object):
     ]
 
     ymodem=False
+    abort_requested=False 
     
     def __init__(self, getc, putc, mode='xmodem', pad=b'\x1a'):
         self.getc = getc
@@ -433,6 +434,7 @@ class XMODEM(object):
         self.cancel = 0
         last_message=time.time()
         message_period=2.0 # emit progress every x seconds
+        packet_size = 128
 
         # if we are given a stream, don't close it when returning
         if stream is not None:
@@ -454,6 +456,11 @@ class XMODEM(object):
                     # print("[sync will ask for CRC with 'C']")
                     if not self.putc(CRC):
                         self.log.debug('recv error: putc failed, '
+                                       'sleeping for %d', delay)
+                        time.sleep(delay)
+                        self.error_count += 1
+                    elif not self.putc(b'K'): # and ask for 1k packets.
+                        self.log.debug('recv error: putc failed asking for 1k, '
                                        'sleeping for %d', delay)
                         time.sleep(delay)
                         self.error_count += 1
@@ -495,13 +502,19 @@ class XMODEM(object):
         ymodem_data={}
         self.error_count = 0
         income_size = 0
-        packet_size = 128
         sequence = 1
         self.cancel = 0
+        # threaded code can set this to True to abort
+        self.abort_requested=False 
         
         while True:
             while True:
                 # print("[top of inner while, self.char: %r]"%self.char)
+                if self.abort_requested:
+                    self.log.debug('aborting')
+                    self.abort(count=5,timeout=10);
+                    return None
+                
                 if self.char == SOH:
                     if packet_size != 128:
                         self.log.debug('recv: SOH, using 128b packet_size')

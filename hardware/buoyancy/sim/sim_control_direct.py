@@ -331,13 +331,13 @@ class Drifter(object):
         return fig
 
 
-# using instant position for error:
-# with transit_fraction=0.1
-sim=Drifter(z_set=-0.10,Cd=0.15,
-            P=5,T_deriv=19,T_accel=0.0,rate_int=0.12,
+# trying to recreate the wobble of DATA0044.BIN
+sim=Drifter(z_set=-0.25,Cd=0.5,
+            P=5,T_deriv=19,rate_int=0.08,
+            T_accel=0,
             control_mode='direct_limited',transit_fraction=0.1,
-            u_star=0.01,T_w_est=10.0,lowpass_error=False,
-            z_bed=-0.20,dt=0.1,
+            u_star=0.000000,T_w_est=10.0,lowpass_error=False,
+            z_bed=-0.55,dt=0.1,
             deadband=0.00)
 sim.integrate(500)
 sim.plot(5)

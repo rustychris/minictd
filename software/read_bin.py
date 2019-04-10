@@ -6,6 +6,7 @@ import numpy as np
 import xarray as xr
 from stompy.io import nmea
 from stompy import utils
+import logging as log
 
 class DuckFile(object):
     def __init__(self,fn,header=None):
@@ -28,6 +29,26 @@ class DuckFile(object):
         if 'gps_nmea' in ds:
             gps_ds=self.parse_gps(ds)
             ds.update(gps_ds,inplace=True)
+
+        if 'seconds' in ds:
+            # RTC records only to integer seconds
+            # infer a sub-second timestep and add
+            # dec_seconds
+
+            # assume that the first sample right after a change in
+            # seconds is "exact", and also the first sample
+            exact=np.r_[ True, np.diff(ds.seconds)!=0]
+            index=np.arange(len(ds.seconds))
+            t=np.interp(index,index[exact],ds.seconds.values[exact].astype(np.float64))
+            ds['dec_seconds']=t
+            ds['time']=('frame',),utils.unix_to_dt64(t)
+
+            # get a few 0 results - drop them entirely
+            bad=t==0
+            n_bad=bad.sum()
+            if n_bad>0:
+                log.warning("%d frames have no time -- will remove them"%n_bad)
+                ds=ds.isel(frame=~bad)
             
         return ds
     
