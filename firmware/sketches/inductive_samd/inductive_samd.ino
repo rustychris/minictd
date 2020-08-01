@@ -7,11 +7,19 @@
 
 // http://www.atmel.com/Images/Atmel-42258-ASF-Manual-SAM-D21_AP-Note_AT07627.pdf pg 73
 
+#include <arduinoFFT.h>
+
 #define ADCPIN A1
-#define ADC_HWORDS 32
+// This has to be a power of 2
+#define NSAMPLES_FFT 1024
+// as does this
+#define DAC_HWORDS 32
+#define ADC_HWORDS (NSAMPLES_FFT+DAC_HWORDS)
+
+arduinoFFT FFT = arduinoFFT(); /* Create FFT object */
+
 uint16_t adcbuf[ADC_HWORDS];     
 
-#define DAC_HWORDS 16
 uint16_t dacbuf[DAC_HWORDS];
 
 typedef struct {
@@ -26,7 +34,7 @@ volatile dmacdescriptor wrb[12] __attribute__ ((aligned (16)));
 volatile dmacdescriptor descriptor_section[12] __attribute__ ((aligned (16)));
 dmacdescriptor descriptor __attribute__ ((aligned (16)));
 
-static uint32_t chnl = 0;  // DMA channel
+static uint32_t adcdma_chnl = 0;  // DMA channel
 volatile uint32_t dmadone;
 volatile uint8_t active_channel=0;
 
@@ -119,10 +127,10 @@ static void ADCsync() {
 void adc_dma(void *rxdata,  size_t hwords) {
   uint32_t temp_CHCTRLB_reg;
   
-  DMAC->CHID.reg = DMAC_CHID_ID(chnl);
+  DMAC->CHID.reg = DMAC_CHID_ID(adcdma_chnl);
   DMAC->CHCTRLA.reg &= ~DMAC_CHCTRLA_ENABLE;
   DMAC->CHCTRLA.reg = DMAC_CHCTRLA_SWRST;
-  DMAC->SWTRIGCTRL.reg &= (uint32_t)(~(1 << chnl));
+  DMAC->SWTRIGCTRL.reg &= (uint32_t)(~(1 << adcdma_chnl));
 
   temp_CHCTRLB_reg = DMAC_CHCTRLB_LVL(1) |
     DMAC_CHCTRLB_TRIGSRC(ADC_DMAC_ID_RESRDY) | DMAC_CHCTRLB_TRIGACT_BEAT;
@@ -138,10 +146,10 @@ void adc_dma(void *rxdata,  size_t hwords) {
   // in then.
   descriptor.dstaddr = (uint32_t)rxdata + hwords*2;
   descriptor.btctrl =  DMAC_BTCTRL_BEATSIZE_HWORD | DMAC_BTCTRL_DSTINC | DMAC_BTCTRL_VALID;
-  memcpy_vol(&descriptor_section[chnl],&descriptor, sizeof(dmacdescriptor));
+  memcpy_vol(&descriptor_section[adcdma_chnl],&descriptor, sizeof(dmacdescriptor));
 
   // start channel
-  DMAC->CHID.reg = DMAC_CHID_ID(chnl);
+  DMAC->CHID.reg = DMAC_CHID_ID(adcdma_chnl);
   // an ADCsync() here did not help
   ADCsync(); 
   ADC->SWTRIG.reg |= 0x01; // FLUSH
@@ -166,11 +174,11 @@ void adc_dma_status(void) {
   Serial.print("ADC SWTRIG: "); Serial.println(ADC->SWTRIG.reg,HEX);
   Serial.print("ADC EVCTRL: "); Serial.println(ADC->EVCTRL.reg,HEX);
   
-  Serial.print("WRB[adc dma]  btctrl   "); Serial.println(wrb[chnl].btctrl);
-  Serial.print("              btcnt    "); Serial.println(wrb[chnl].btcnt);
-  Serial.print("              srcaddr  "); Serial.println(wrb[chnl].srcaddr);
-  Serial.print("              dstaddr  "); Serial.println(wrb[chnl].dstaddr);
-  Serial.print("              descaddr "); Serial.println(wrb[chnl].descaddr);
+  Serial.print("WRB[adc dma]  btctrl   "); Serial.println(wrb[adcdma_chnl].btctrl);
+  Serial.print("              btcnt    "); Serial.println(wrb[adcdma_chnl].btcnt);
+  Serial.print("              srcaddr  "); Serial.println(wrb[adcdma_chnl].srcaddr);
+  Serial.print("              dstaddr  "); Serial.println(wrb[adcdma_chnl].dstaddr);
+  Serial.print("              descaddr "); Serial.println(wrb[adcdma_chnl].descaddr);
 }
 
 void adc_init(){
@@ -187,7 +195,8 @@ void adc_init(){
   ADC->AVGCTRL.reg = 0x00 ;       //no averaging
   ADC->SAMPCTRL.reg = 0x00;  ; //sample length in 1/2 CLK_ADC cycles
   ADCsync();
-  ADC->CTRLB.reg = ADC_CTRLB_PRESCALER_DIV16 | ADC_CTRLB_FREERUN | ADC_CTRLB_RESSEL_10BIT;
+  // ADC->CTRLB.reg = ADC_CTRLB_PRESCALER_DIV16 | ADC_CTRLB_FREERUN | ADC_CTRLB_RESSEL_10BIT;
+  ADC->CTRLB.reg = ADC_CTRLB_PRESCALER_DIV16 | ADC_CTRLB_FREERUN | ADC_CTRLB_RESSEL_12BIT;
   ADCsync();
   ADC->CTRLA.bit.ENABLE = 0x01;
   ADCsync();
@@ -200,11 +209,12 @@ void setup(){
   float phase = 3.14159 * 2./DAC_HWORDS;
 
   Serial.begin(115200);
+  while(!Serial);
   Serial.println("Inductive Conductivity Testing");
 
-  for (i=0;i<DAC_HWORDS;i++) dacbuf[i]= sinf(i*phase) * 500.0f + 512.0f;
+  for (i=0;i<DAC_HWORDS;i++) dacbuf[i]= sinf(i*phase) * 100.0f + 512.0f;
   analogWriteResolution(10);
-  analogWrite(A0,123);   // DAC init setup DAC pin and zero it
+  analogWrite(A0,512);   // DAC init setup DAC pin and zero it
 
   // ADC 
   adc_init();
@@ -214,10 +224,88 @@ void setup(){
   dac_dma_init();   // will increment DAC output per ADC sample.
 }
 
+ 
+ 
+// void show(const char * s, cplx buf[]) {
+// 	printf("%s", s);
+// 	for (int i = 0; i < 8; i++)
+// 		if (!cimag(buf[i]))
+// 			printf("%g ", creal(buf[i]));
+// 		else
+// 			printf("(%g, %g) ", creal(buf[i]), cimag(buf[i]));
+// }
+ 
+ 
+void samples_postprocess(uint16_t *adcbuf, double sample_rate) {
+  // FFT on adcbuf
+  // report fundamental, harmonic distortion(?), and noise
+  
+  // Populate double arrays
+  double phase_fund;
+  double vReal[NSAMPLES_FFT];
+  double vImag[NSAMPLES_FFT];
+  double power;
+  double pow_fund,pow_harm=0.0,pow_noise=0.0;
+  int n_harm=0,n_noise=0;
+  
+  for(int i=0;i<NSAMPLES_FFT;i++) {
+    // Take the latter part of the buffer
+    vReal[i]=adcbuf[i+ADC_HWORDS-NSAMPLES_FFT];
+    vImag[i]=0.0;
+  }
+
+  // No windowing since we're sampling an integral number
+  // of periods
+  FFT.Compute(vReal, vImag, NSAMPLES_FFT, FFT_FORWARD);
+  phase_fund=atan2(vImag[NSAMPLES_FFT/DAC_HWORDS],
+                   vReal[NSAMPLES_FFT/DAC_HWORDS]);
+  FFT.ComplexToMagnitude(vReal, vImag, NSAMPLES_FFT);
+
+  // Print the results
+  for (int i = 0; i < NSAMPLES_FFT/2; i++)
+    {
+      double abscissa;
+      /* Print abscissa value */
+      abscissa = ((i * 1.0 * sample_rate) / NSAMPLES_FFT);
+      
+      if(0) {
+        Serial.print(abscissa, 1);
+        Serial.print("Hz");
+        Serial.print(" ");
+        Serial.println(vReal[i], 2);
+      }
+      
+      power=vReal[i]/NSAMPLES_FFT;
+      power=power*power;
+      
+      if(i>0) {
+        if( i == NSAMPLES_FFT/DAC_HWORDS ) {
+          pow_fund=power;
+        } else if ( i % (NSAMPLES_FFT/DAC_HWORDS) == 0 ) {
+          pow_harm += power;
+          n_harm++;
+        } else {
+          pow_noise += power;
+          n_noise++;
+        }
+      }
+    }
+  // Serial.println();
+  Serial.print("Pow fundamental: "); Serial.print(pow_fund,3);
+  Serial.print("   phase(deg): "); Serial.print(phase_fund*180/3.14159,2);
+  Serial.print("   harmonic: "); Serial.print(pow_harm,3);
+  Serial.print(" / "); Serial.print(n_harm);
+  Serial.print(" = "); Serial.print(pow_harm/n_harm,3);
+  Serial.print("   noise: "); Serial.print(pow_noise,3);
+  Serial.print(" / "); Serial.print(n_noise);
+  Serial.print(" = "); Serial.print(pow_noise/n_noise,3);
+  Serial.println();
+}
+
 void loop() {
   uint32_t t,i;
-  double freq;
-  Serial.println("Top of loop");
+  double freq,sig_freq;
+  //Serial.println("Top of loop");
 
   for(i=0;i<ADC_HWORDS;i++) {
     adcbuf[i]=0;
@@ -226,9 +314,8 @@ void loop() {
   t = micros();
   adc_dma(adcbuf,ADC_HWORDS);
 
-  adc_dma_status();
-  
-  Serial.println("Waiting");
+  // adc_dma_status();
+  // Serial.println("Waiting");
   while( !dmadone ) { // await DMA done isr
     if ( micros() - t > 5000 ) {
       Serial.println("Failed to get out of dmadone wait");
@@ -252,170 +339,75 @@ void loop() {
   t = micros() - t;
 
   freq = 1e3 * float(ADC_HWORDS) / t;
+  sig_freq=freq/DAC_HWORDS;
 
-  Serial.print("dmadone: "); Serial.println(dmadone);
-  Serial.print("int channel: "); Serial.println(active_channel);
-  Serial.print("----");
-  Serial.print(t);
-  Serial.print(" us  ");
-  Serial.print(freq);
-  Serial.println(" kHz ----");
+  //  Serial.print("dmadone: "); Serial.println(dmadone);
+  // Serial.print("int channel: "); Serial.println(active_channel);
+  // Serial.print("----");
+  // Serial.print(t);
+  // Serial.print(" us  ");
+  // Serial.print(freq);
+  // Serial.print(" kHz");
+  // Serial.print("  Signal ");
+  // Serial.print(sig_freq);
+  // Serial.println(" kHz ----");
   
-  for(i=0;i<ADC_HWORDS;i++) {
-    Serial.print(dacbuf[i%DAC_HWORDS]);
-    Serial.print("   ");
-    Serial.println(adcbuf[i]);
-  }
-  Serial.println("----");
+  // for(i=0;i<DAC_HWORDS;i++) {
+  //   Serial.print(dacbuf[i%DAC_HWORDS]);
+  //   Serial.print("   ");
+  //   Serial.println(adcbuf[i]);
+  // }
+  // Serial.println("----");
 
-  delay(500);
+  samples_postprocess(adcbuf,freq*1000);
 
-  // And print a few updated conversions
-  for (i=0;i<5;i++){
-    Serial.print("ADC result:");
-    ADCsync();
-    Serial.println(ADC->RESULT.reg);
-    delay(20);
-  }
+  delay(50);
+  // while(1); 
 
-  Serial.println("End of loop");
+  // // And print a few updated conversions
+  // for (i=0;i<5;i++){
+  //   Serial.print("ADC result:");
+  //   ADCsync();
+  //   Serial.println(ADC->RESULT.reg);
+  //   delay(20);
+  // }
+
+  // Serial.println("End of loop");
 }
-
-// This prints typ. 2055 us   425
-// ADC_HWORDS is 1024
-// Not sure why dstaddr gets set to the end address.
-
-// That's working sometimes.
-// but then sometimes it's just getting alternating 0, 1023 on the ADC.
-// and eventually hangs??
-
-// Disabling the DAC code seems to make the ADC code more stable.
-// hmm.. This time it got through 6 reads, then froze.
-// try switching priorities?
-// DMAC_CHCTRLB_LVL(0) for DAC, and 1 for ADC?
-// No - eventually freezes this way, too.
-
-// Can I find where it's freezing?
-// With the added print statements it has been running for a lot longer
-// now. but it eventually froze, and just after the 'top of loop' message.
-
-// 
-// Not sure why there is a lag at the start of the ADC readings.
-// Shouldn't this be running full-steam all the time?
-//   unless the ADC doesn't run free when nobody is reading its output.
-//   in that case the ADC and DAC are sitting still until DMA starts.
-//   in that case, a failure to trigger an initial DMA would also mean
-//   that the ADC would never start firing.
-
-// TODO:
-// Read through the App note to see if there are additional considerations
-// for getting the ADC and DAC to play nicely together.
-//    No help.  They are running a single DMA transfer, straight from ADC to
-//    DAC.
-// Have to go to the datasheet.
-//  -- advice on priorities?
-//  -- any way to chain the DMA transfers, rather than having them trigger
-//     on the same event?  I don't think so.
-//  -- dissect adc_dma -- added several print statements...
-
-// consider having interrupt handler only respond on adc dma channel
-//  -- if it freezes
-
-
-// Try to figure out why there is a lag in the ADC values.
-// the ADC buffer is a multiple of the DAC buffer size, so once
-// the ADC is in freerun mode, it should remain in phase with the
-// DAC output.
-//  Can also print dmadone, to see if we're occasionally getting
-//  DMA errors.
-// Eventually froze again -- after the end of adc_dma::E, but
-// I guess dmadone never got set?
-
-// with new output:
-// int channel is always coming out 0.  Good.
-// dmadone==2.  That's TCMPL.  Good.
-
-// it eventually timed out waiting for dmadone.  no indication of why.
-// previous interrupts look exactly the same.
-
-// Next thing is to check on status flags, before and after
-// loop times out
-
-// Typical output now:
-// CHINTFLAG: 0
-// CHCTRLA: 0  // rarely 2
-// CHCTRLB: 802720
-// CHSTATUS: 0
-
-// When it does freeze, CHCTRLA is 2 both at the end of adc_dma
-// and when it fails out.  That corresponds to the ENABLE bit --
-// so I think it just means that the channel is still enabled?
-// not sure how it would not always be 2 at the end adc_dma?
-
-// No luck.
-// Is it possible that the ADC is having some issue?
-
-// typical values:
-// ADC STATUS: 0
-//     INTFLAG: 0x0B == SYNCRDY | OVERRUN | RESRDY ?
-//     CTRLA: 2 == ENABLE ( no run-in-standy, no software reset underway)
-//     CTRLB: 0x0224 == prescaler 0x02=div16 | RES 10 bit | FREERUN
-// no different when it fails.
-
-// when it fails, only the first entry has been written to.
-// print a few more ADC results (have to read the register directly I think)
-//    -- is the ADC still in freerun, and just the DMA stalled out?
-//    -- or did the ADC error out and stop
-// Looks like each read triggers a DAC update, even if spaced out.
-// when it fails, I get a single value read like 510.
-// then I read the register a few more times and get 509, 501 699, 860, 969.
-// even though I'm pausing 20ms between each of those.
-
-// does this occur if I manually read some more afterwards?
-// seems to just pick up two samples of DAC output after the last seen
-// in the buffer..
-// like the adcbuf ends with dac[5], we miss 6,7 and a late read gets
-// dac[8], dac[9], ...
-
-
-//  will need to spin on SYNCBUSY, probably
-//  print ADC->SWTRIG, ADC->EVCTRL.
-
-//  the result register is read-synchronized. Is it possible that the timing is
-//  off here?
-
-// Is anything not volatile that should be volatile?  MAYBE - the descriptors.
-// Hack at that. not sure that I got the volatile stuff done correctly.
-// still freezes.
-
-// Can print BTCNT in the writeback descriptor
-// typically btctrl 0x2304
-//   btcnt 0
-//   sraddres 1107312666
-//   dstaddre 536871294
-//   descadress 0
-
-// SWTRIG=0  EVCTRL=0  -- unchanging
-
-// When it freezes
-//    btctrl 2305 -- extra bit means the descriptor is still VALID.
-//    btcnt 32 -- means that it hasn't incremented at all?
-// others the same.
-
-
-// Could print DMAC->ACTIVE.reg
-
-// I'm wondering if it is going *too* fast.  Without the print statements,
-// I was seeing over 400kSPS, while it is spec'd at 350kSPS.
-// would it be safer if I didn't push it like that?
-
-
-// Is there some part of the DMA process that should wait on the ADC?
-// try just before enabling the channel.
-// it went into the 0,1023,0,1023 bit for a while, and finally froze.
-// no difference in the register values.
-
 
 // What if I flush the ADC before starting DMA?  So far so good....????
 //  still going.
+// Deleted a ton of notes on debugging the ADC freezing.
+
+// Reading 12-bit drops the rate from 440kHz or so to 370 kHz.
+// Writing 12-bit to the DAC didn't go so well. seems to often just
+// spit out 4095 / 0.  but sometimes it gets real numbers.
+// still very occasionally gets a glitch with 10-bit DAC and 12-bit ADC,
+// namely the first entry being 0.
+
+
+// With DAC amplitude of 1000 p-p, seems to saturate output when a short
+// is in the toroid.
+// 200p-p still saturates.
+// 20p-p still saturates.
+// 4 counts p-p? now I get a swing of about 1500, but it's not symmetric?
+// Adjust code to extract the synchronous signal, phase and amplitude.
+// then try this again with some test solutions.
+// At that point consider a combination of a divider on the DAC output
+// and/or a smaller transimpedance gain.
+// Also print out the drive frequency in addition to the sample frequency.
+
+// That's working
+// I'm getting power of 39802 at the signal frequency of 13.27kHz
+// 0.8 in harmonics
+// 1.7 in noise.
+
+// 42dB SINAD across the full bandwidth.
+// So if the noise if white, that's 1.7 across 250-ish bins?
+// So an estimate of the band-limited noise is 68dB.
+// pretty respectable.
+// handwaving, that's better than a 1ppt meaurement.
+// And I could scale up the size of the fft to get a bit better.
+// say 1024 samples would get me to > 70dB
+
 
