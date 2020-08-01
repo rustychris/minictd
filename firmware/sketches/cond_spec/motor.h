@@ -56,6 +56,7 @@ public:
   void enable(void);
   // returns 0 for stop on user input, and MOTOR_LIMIT if a limit was detected
   int wait_and_stop(void);
+  void autoset_sense_offset(void);
 
   void command(int motor,int cmd);
   void read_current(int motor);

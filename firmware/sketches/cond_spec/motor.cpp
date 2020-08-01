@@ -20,8 +20,11 @@ void Motor::init() {
   // user to enable.
   disable();
 
-  a_sense_offset=analogRead(MOTOR_ASENSE);
-  b_sense_offset=analogRead(MOTOR_BSENSE);
+  //a_sense_offset=analogRead(MOTOR_ASENSE);
+  // b_sense_offset=analogRead(MOTOR_BSENSE);
+  // safer to just set some known defaults
+  a_sense_offset=24;
+  b_sense_offset=24;
   a_position=-99999; // no knowledge of absolute position
   b_position=-99999; // 
 }
@@ -32,16 +35,12 @@ void Motor::disable(void){
   enabled=false;
 }
 
-void Motor::enable(void) {
-  // whenever re-enabing get a new baseline sense offset
-  // among other things, if battery power comes up after
-  // USB power, the original readings could be bad.
+void Motor::autoset_sense_offset(void) {
   const int samples=50;
-  a_sense_offset=b_sense_offset=0;
   int i,reading;
   
-  digitalWrite(MOTOR_nSLEEP,1);
-
+  a_sense_offset=b_sense_offset=0;
+  all_off();
   for(i=0;i<samples;i++) {
     reading=analogRead(MOTOR_ASENSE);
     // mySerial.print("MOTOR_ASENSE="); mySerial.println(reading);
@@ -55,6 +54,11 @@ void Motor::enable(void) {
     b_sense_offset+=reading;
   }
   b_sense_offset/=samples;
+}
+
+void Motor::enable(void) {
+  all_off();
+  digitalWrite(MOTOR_nSLEEP,1);
 
   enabled=true;
 }
@@ -307,6 +311,20 @@ bool Motor::dispatch_command(const char *cmd, const char *cmd_arg) {
     } else {
       mySerial.print("motor_enable="); mySerial.println( enabled );
     }
+  } else if(!strcmp(cmd,"motor_a_sense_offset")) {
+    if(cmd_arg) {
+      a_sense_offset=atoi(cmd_arg);
+    }
+    mySerial.print("motor_a_sense_offset="); mySerial.println( a_sense_offset );
+  } else if(!strcmp(cmd,"motor_b_sense_offset")) {
+    if(cmd_arg) {
+      b_sense_offset=atoi(cmd_arg);
+    }
+    mySerial.print("motor_b_sense_offset="); mySerial.println( b_sense_offset );
+  } else if(!strcmp(cmd,"motor_autoset_offsets")) {
+    autoset_sense_offset();
+    mySerial.print("motor_a_sense_offset="); mySerial.println( a_sense_offset );
+    mySerial.print("motor_b_sense_offset="); mySerial.println( b_sense_offset );
   } else {
     return false;
   }
@@ -319,6 +337,9 @@ void Motor::help() {
   mySerial.println("    motor               # report sense and drive");
   mySerial.println("    motor_enable        # report motor enable status");
   mySerial.println("    motor_enable=[0,1]  # disarm/arm motor");
+  mySerial.println("    motor_a_sense_offset=<N>  # set current offset");
+  mySerial.println("    motor_b_sense_offset=<N>  # set current offset");
+  mySerial.println("    motor_autoset_offsets  # detect current offsets");
   mySerial.println("    motor_off           # all motors off");
   mySerial.println("    motor_a_fwd         # motor A forward until keypress");
   mySerial.println("    motor_a_rev         # motor A reverse until keypress");

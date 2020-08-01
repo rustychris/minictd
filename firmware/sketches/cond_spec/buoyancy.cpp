@@ -221,8 +221,9 @@ void Buoyancy::async_read() {
     // Serial.print("  piston_ml="); Serial.print(piston_ml,4);
     // Serial.print("  ctrl_prop="); Serial.print(ctrl_prop,4);
     // Serial.print("  ctrl_deriv="); Serial.print(ctrl_deriv,4);
-    
-    ctrl=BUOY_PISTON_ML; // max neg.
+
+    // be sure we keep cranking
+    ctrl=piston_ml+5*BUOY_PISTON_ML; // max neg.
   } 
 
   // ctrl is target volume of water in piston in ml
@@ -248,7 +249,7 @@ void Buoyancy::async_read() {
       mySerial.print("  NEG");
       motor.command(BUOY_MTR_SEL,BUOY_MTR_NEG);
     }
-  } else if(change_request<deadband) {
+  } else if(change_request<-deadband) {
     // below target depth, become more positive by decreasing
     // piston water volume
     if(motor.status(BUOY_MTR_SEL) & BUOY_MTR_POS) {
@@ -382,7 +383,7 @@ bool Buoyancy::dispatch_command(const char *cmd, const char *cmd_arg) {
   } else if(!strcmp(cmd,"buoy_G_prop")) {
     set_float(cmd_arg,&G_prop,"buoy_G_prop");
   } else if(!strcmp(cmd,"buoy_R_integ")) {
-    set_float(cmd_arg,&R_integ,"buoy_G_prop");
+    set_float(cmd_arg,&R_integ,"buoy_R_integ");
   } else if(!strcmp(cmd,"buoy_T_deriv")) {
     set_float(cmd_arg,&T_deriv,"buoy_T_deriv");
   //  } else if(!strcmp(cmd,"buoy_T_lowpass")) {

@@ -111,19 +111,22 @@ uint8_t MS5803::begin(void)
     uint8_t highByte = PRESS_WIRE.read(); 
     uint8_t lowByte = PRESS_WIRE.read();
     coefficient[i] = (highByte << 8)|lowByte;
-    // // Uncomment below for debugging output.
-    // mySerial.print("C");
-    // mySerial.print(i);
-    // mySerial.print("= ");
-    // mySerial.println(coefficient[i]);
   }
   
-  // mySerial.print("CRC calculated: ");
-  // mySerial.println(crc4());
-  // mySerial.print("CRC fetched: ");
-  // mySerial.println(coefficient[7]&0x000F);
   if ( crc4() != coefficient[7]&0x000F ) {
     mySerial.println("ERROR: ms5803 CRC check failed");
+
+    mySerial.print("CRC calculated: ");
+    mySerial.println(crc4());
+    mySerial.print("CRC fetched: ");
+    mySerial.println(coefficient[7]&0x000F);
+  
+    for(i = 0; i <= 7; i++) {
+      mySerial.print("C");
+      mySerial.print(i);
+      mySerial.print("= ");
+      mySerial.println(coefficient[i]);
+    }
   }
 
   return 0;

@@ -35,6 +35,8 @@ void Shell::command_loop(void) {
 void Shell::dispatch_command(const char *cmd, const char *cmd_arg) {
   if ( strcmp(cmd,"help")==0 ) {
     help();
+  } else if ( strcmp(cmd,"compile_date")==0 ) {
+    mySerial.println("compile_date=" __DATE__ " " __TIME__ );
   } else if ( strcmp(cmd,"!")==0 ) {
     // do nothing - this is just to get to command mode.
   } else if ( strcmp(cmd,"softboot")==0 ) {
@@ -175,5 +177,6 @@ void Shell::get_next_command(const char *prompt) {
 void Shell::help(void){
   mySerial.println("Available commands:");
   mySerial.println("  System");
-  mySerial.println("    softboot # reboot");
+  mySerial.println("    softboot     # reboot");
+  mySerial.println("    compile_date # show date/time of compilation");
 }
