@@ -1,2 +1,7 @@
 *.pyc
-
+*.BIN
+saved.bin
+tmp
+gps-track.csv
+dump*
+CARD6637
